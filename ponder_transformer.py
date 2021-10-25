@@ -1,15 +1,15 @@
 import argparse
-from vanilla_transformer import Transformer
 
 import torch
 import torch.nn as nn
+from util import make_tgt_mask
 
 
 class PonderTransformer(nn.Module):
     def __init__(
-        self,vocab_size ,emb_dim=300, max_steps=20, allow_halting=False,num_tokens = 10
+        self,vocab_size ,emb_dim=300, max_steps=20, allow_halting=False,nhead=10
     ):
-        """ PonderNet + TransformerBlock
+        """ PonderNet + Transformer
 
         Args:
             vocab_size (int): 
@@ -17,23 +17,24 @@ class PonderTransformer(nn.Module):
             max_steps (int, optional): Defaults to 20.
             allow_halting (bool, optional): If True, then the forward pass is allowed to halt before
                                             reaching the maximum steps. Defaults to False.
-            num_tokens (int, optional): number of output types. Defaults to 10.
+            nhead (int, optional): Defaults to 10.
         """
         super().__init__()
         self.max_steps = max_steps
-        self.emb_dim = emb_dim
         self.allow_halting = allow_halting
-        self.num_tokens = num_tokens
         
         self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
-        self.transformer_layer = Transformer(emb_dim=emb_dim)
-        self.output_layer = nn.Linear(emb_dim, num_tokens)
+        self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
+        self.transformer_decoder_layer = nn.TransformerDecoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
         self.lambda_layer = nn.Linear(emb_dim, 1)
 
         
-    def forward(self, x):
-        mask = (x == 0).unsqueeze(1).repeat(1, x.size(1), 1).unsqueeze(1)
+    def forward(self, x,true_y,tgt_mask=None):
+        src_key_padding_mask = (x == 0)
+        tgt_key_padding_mask = (true_y == 0)
         x = self.embedding(x)
+        true_y = self.embedding(true_y)
+        
         
         batch_size, _, _ = x.shape
         device = x.device
@@ -50,6 +51,7 @@ class PonderTransformer(nn.Module):
         )
 
         for n in range(1, self.max_steps + 1):
+            x = self.transformer_encoder_layer(x,src_key_padding_mask=src_key_padding_mask)
             if n == self.max_steps:
                 lambda_n = x.new_ones(batch_size)  # (batch_size,)
             else:
@@ -59,7 +61,16 @@ class PonderTransformer(nn.Module):
                 ]  # (batch_size,)
             
             # Store releavant outputs
-            y_list.append(self.output_layer(x))  # (batch_size,)
+            #y_list.append(self.output_layer(x))  # (batch_size,)
+            h = true_y.clone()
+            for _ in range(n):
+                print(h.shape)
+                print(tgt_key_padding_mask.shape)
+                h = self.transformer_decoder_layer(tgt=h,memory=x,tgt_mask=tgt_mask,tgt_key_padding_mask=tgt_key_padding_mask)
+            y_list.append(h)
+            
+            
+            
             p_list.append(un_halted_prob * lambda_n)  # (batch_size,)
 
             halting_step = torch.maximum(
@@ -71,7 +82,6 @@ class PonderTransformer(nn.Module):
 
             # Prepare for next iteration
             un_halted_prob = un_halted_prob * (1 - lambda_n)
-            x = self.transformer_layer(x,mask)
 
             # Potentially stop if all samples halted
             if self.allow_halting and (halting_step > 0).sum() == batch_size:
@@ -85,12 +95,16 @@ class PonderTransformer(nn.Module):
 
 def main():
     vocab_size = 500
-    model = PonderTransformer(vocab_size=vocab_size)
+    model = PonderTransformer(vocab_size=vocab_size,allow_halting=True)
     x = torch.randint(low=0,high=vocab_size-1,size=(2,50))
-    pred_y, p, h = model(x)    
+    true_y = torch.randint(low=0,high=vocab_size-1,size=(2,5))
+    tgt_mask = make_tgt_mask(5)
+    
+    pred_y, p, h = model(x,true_y,tgt_mask=tgt_mask)
     print(pred_y.shape)# (max,step, batch_size, seq_len, dim)
     print(p.shape)# (max_step, batch_size)
-    print(h.shape)# (batch_size)
+    print(h.shape)# (batch_size), ループ回数
+    print(h)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='このプログラムの説明') 
