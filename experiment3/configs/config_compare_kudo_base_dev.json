@@ -1,0 +1,51 @@
+{
+    "seed" : 616,
+    "number_of_symbols" : 26,
+    "max_number_of_question" : 10000,
+    "min_value" : 0,
+    "max_value" : 99,
+    "dtype" : "int",
+    "output_type" : "ask_last_question",
+
+
+    "generation_rules" : [
+	
+	{
+	    "comment" : "10段階の計算",
+	    "type" : "template",
+	    "selection_probability" : 1,
+
+	    "assignment_format" : [   
+		{
+		    "type" : "Substitution",
+		    "format" : ["num"]
+		},
+		
+		{
+		    "type" : "AddSubstitution",
+		    "format" : [[0, "num"]],
+		    "commutative" : true
+		},
+		
+		{
+		    "type" : "AddSubstitution",
+		    "format" : [[1, "num"]],
+		    "commutative" : true
+		},
+
+		{
+		    "type" : "AddSubstitution",
+		    "format" : [[2, "num"]],
+		    "commutative" : true
+		}
+	    ],
+	
+    
+	    "operator" : {
+		"type" : ["Check"],
+		"selection_probabilities" : [1], 
+		"arg_pos" : [1]
+	    }
+	}
+    ]
+}

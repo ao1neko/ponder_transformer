@@ -1,0 +1,123 @@
+{
+    "seed" : 616,
+    "number_of_symbols" : 26,
+    "max_number_of_question" : 10,
+    
+    "min_value" : 0,
+    "max_value" : 9,
+    "dtype" : "int",
+    
+    
+    "output_type" : "ask_all_variables",
+
+
+    "generation_rules" : [
+
+	
+	{
+	    "type" : "template",
+	    "selection_probability" : 0.5,
+
+	    "assignment_format" : [
+		    
+		{
+		    "type" : "Substitution",
+		    "format" : ["num"]
+		},
+		
+		
+		{
+		    "type" : "Substitution",
+		    "format" : ["num", "var"]
+		},
+		
+		
+		{
+		    "type" : "AddSubstitution",
+		    "format" : [[0, "num"], [1, "num"], ["var", "var"]],
+		    "commutative" : true
+		},
+		
+		
+		{
+		    "type" : "AddSubstitution",
+		    "format" : [["var", "var"]]
+		}
+		
+	    ],
+	    
+	
+    
+	    "operator" : {
+		"type" : ["Add", "Max", "WhoMax"],
+		"selection_probabilities" : [0.33333, 0.33333, 0.33333], 
+		"arg_pos" : [[-1, -2]],
+		"commutative" : true
+	    }
+	},
+
+
+	
+
+	{
+	    "type" : "random",
+	    "selection_probability" : 0.5,
+
+	    "reasning_step" : {
+		"min" : 4,
+		"max" : 5
+	    },
+
+	    "assignment_format" : [
+	
+		{
+		    "type" : "Substitution",
+		    "format" : ["num"],
+		    "step_weight" : 1,
+		    "probability" : 0.2
+		},
+		
+		
+		{
+		    "type" : "Substitution",
+		    "format" : ["var"],
+		    "step_weight" : 1,
+		    "probability" : 0.2
+		},
+		
+		
+		{
+		    "type" : ["AddSubstitution", "SubSubstitution"],
+		    "format" : [["num", "num"]],
+		    "step_weight" : 1,
+		    "probability" : 0.2
+		},
+		
+		
+		{
+		    "type" : ["AddSubstitution", "SubSubstitution"],
+		    "format" : [["var", "num"]],
+		    "step_weight" : 1,
+		    "probability" : 0.2,
+		    "commutative" : true
+		},
+				
+		
+		{
+		    "type" : ["AddSubstitution", "SubSubstitution"],
+		    "format" : [["var", "var"]],
+		    "step_weight" : 2,
+		    "probability" : 0.2
+		}
+		
+	    ],
+	    
+
+	    "operator" : {
+		"type" : ["WhoMax"],
+		"selection_probabilities" : [1],
+		"arg_pos" : [["random", "random"]]
+	    }
+	}
+    ]
+}
