@@ -6,7 +6,7 @@ from util import make_tgt_mask
 
 class Transformer(nn.Module):
     def __init__(
-        self,vocab_size ,emb_dim=300,num_layers=1,nhead=10
+        self,vocab_size ,emb_dim=300,num_layers=1,nhead=10,num_token=100
     ):
         """Transformer
 
@@ -17,8 +17,10 @@ class Transformer(nn.Module):
             nhead (int, optional): Defaults to 10.
         """
         super().__init__()
+        self.num_token = num_token
         self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
         self.transformer = nn.Transformer(d_model=emb_dim,nhead=nhead,num_encoder_layers=num_layers,num_decoder_layers=num_layers,batch_first=True)
+        self.output_layer = nn.Linear(emb_dim, self.num_token)
 
         
     def forward(self, x,true_y,tgt_mask):
@@ -28,6 +30,7 @@ class Transformer(nn.Module):
         x = self.embedding(x)
         true_y = self.embedding(true_y)   
         y = self.transformer(x,true_y,tgt_mask=tgt_mask,src_key_padding_mask=src_key_padding_mask,tgt_key_padding_mask=tgt_key_padding_mask)
+        y = self.output_layer(y)
         return y
 
 
