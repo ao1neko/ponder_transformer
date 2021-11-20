@@ -6,6 +6,10 @@ import numpy as np
 import json
 import string
 import tqdm
+import pickle
+import more_itertools
+from util import make_word_dic,make_id_dic,convert_str
+from typing import List,Dict
 
 class Reverse(Dataset):
     def __init__(self,data_size=100,data_dim=40,low = 0,high=10):
@@ -107,20 +111,21 @@ class MultiReasoningData(Dataset):
             text = [word_dic[c] for c in data["passage"]]
             q = [word_dic[c] for c in data["qa_pairs"][0]["question"]]
             
-            list_x.append([word_dic["<CES>"]]+text+[word_dic["<SEP>"]]+q+[word_dic["<SEP>"]])
-            list_y.append([word_dic[c] for c in data["qa_pairs"][0]["answer"]["number"]])
+            list_x.append([word_dic["<CLS>"]]+text+[word_dic["<SEP>"]]+q+[word_dic["<SEP>"]])
+            list_y.append([word_dic["<CLS>"]]+[word_dic[c] for c in data["qa_pairs"][0]["answer"]["number"]]+[word_dic["<SEP>"]])
 
         return list_x,list_y
     
-    def _make_dic(self,upper_chr=True,lower_chr=True,min_value=0,max_value=9,operater=["=",",","+","-","*"],tag=["<CES>","<SEP>"]):
+    def _make_dic(self,upper_chr=True,lower_chr=True,min_value=0,max_value=9,operater=["=",",","+","-","*"],tag=["<CLS>","<SEP>"]):
         dic = {"<PAD>":0}
+        for c in tag: dic[c] = len(dic)
         if upper_chr == True:
             for c in string.ascii_uppercase: dic[c] = len(dic)
         if lower_chr == True:
             for c in string.ascii_lowercase: dic[c] = len(dic)
         for c in range(min_value,max_value+1): dic[str(c)] = len(dic)
         for c in operater: dic[c] = len(dic)
-        for c in tag: dic[c] = len(dic)
+        
         
         return dic
         
@@ -133,14 +138,215 @@ class MultiReasoningData(Dataset):
     def id_to_text(self,l):
         return [self.id_dic[id.item()] for id in l]
     
+class SoftReasonersData(Dataset):
+    def __init__(self,json_pass):
+        self.data_x, self.data_y = self._read_json(json_pass)      
+        self.word_dic = None 
+        self.id_dic = None 
+        self.id_data_x = None
+        self.id_data_y = None
+        self.id_data_x_len = None
+        self.vocab_size = None
+        
+        
+        
+    def __len__(self):
+        return len(self.id_data_x)
+
+    def __getitem__(self, index):
+        return self.id_data_x[index], self.id_data_y[index]
+    
+    def _read_json(self,json_pass):
+        data_x = []
+        data_y = []
+        
+        with open(json_pass,'r') as jsonl_file:
+            json_list = list(jsonl_file)
+            for json_str in json_list:
+                json_dic = json.loads(json_str)
+                context = convert_str(json_dic["context"])
+                
+                for question_dic in json_dic["questions"]:
+                    question = convert_str(question_dic["text"])
+                    answer = convert_str(str(question_dic["label"]))
+                    
+                    data_x.append("<CLS> "+ context + " <SEP> " + question + " <SEP>")
+                    data_y.append(answer)
+        return data_x,data_y
+    
+    def def_dic(self,word_dic:Dict[str,int],id_dic:Dict[int,str]):
+        self.word_dic = word_dic
+        self.vocab_size = len(self.word_dic)
+        self.id_dic = {int(k):v for k,v in id_dic.items()}   
+            
+    def text2id(self,pad_id = 0):
+        if self.word_dic is None : 
+            print("word_dic is None")
+            exit(1)
+        id_data_x = []
+        id_data_y = []
+        
+        for text_x,text_y in zip(self.data_x,self.data_y):
+            id_list_x = []
+            id_list_y = []
+            
+            for word in text_x.split(" "):
+                id_list_x.append(self.word_dic[word])
+            for word in text_y.split(" "):
+                id_list_y.append(self.word_dic[word])
+            id_data_x.append(id_list_x)
+            id_data_y.append(id_list_y)           
+            
+        self.id_data_x_len = max([len(text) for text in id_data_x])
+        
+        #padding
+        for text in id_data_x:
+            text.extend([pad_id] * (self.id_data_x_len - len(text)))
+        
+        self.id_data_x = torch.tensor(id_data_x)
+        self.id_data_y = torch.tensor(id_data_y)
+            
+        
+   
+class BABIData(Dataset):
+    def __init__(self,txt_pass):
+        self.data_x, self.data_y = self._read_txt(txt_pass)      
+        self.word_dic = None 
+        self.id_dic = None 
+        self.id_data_x = None
+        self.id_data_y = None
+        self.id_data_x_len = None
+        self.vocab_size = None
+        
+    def __len__(self):
+        return len(self.id_data_x)
+
+    def __getitem__(self, index):
+        return self.id_data_x[index], self.id_data_y[index]
+    
+    def _read_txt(self,txt_pass):
+        data_x = []
+        data_y = []
+        
+        with open(txt_pass,'r') as txt_file:
+            txt_list = list(txt_file.read().split("\n"))
+            txt_list = txt_list[:-1] #最後の\nを削除
+            
+            for splited_txt_list in more_itertools.split_before(txt_list,lambda t: t[0]=="1"):
+                context = []
+                for txt in splited_txt_list:
+                    if len(txt.split("\t")) == 1:
+                        txt = " ".join(txt.split(" ")[1:])
+                        txt = convert_str(txt)
+                        context.append(txt)
+                    else:
+                        question, answer, _ = txt.split("\t")
+                        question = " ".join(question.split(" ")[1:])
+                        
+                        question = convert_str(question)
+                        answer = convert_str(answer)
+                        
+                        data_x.append("<CLS> "+ " ".join(context) + " <SEP> " +question + " <SEP>")
+                        data_y.append(answer)
+        return data_x,data_y
+    
+    def def_dic(self,word_dic:Dict[str,int],id_dic:Dict[int,str]):
+        self.word_dic = word_dic
+        self.vocab_size = len(self.word_dic)
+        self.id_dic = {int(k):v for k,v in id_dic.items()}   
+        
+    def text2id(self,pad_id = 0):
+        if self.word_dic is None : 
+            print("word_dic is None")
+            exit(1)
+            
+        id_data_x = []
+        id_data_y = []
+        
+        for text_x,text_y in zip(self.data_x,self.data_y):
+            id_list_x = []
+            id_list_y = []
+            
+            for word in text_x.split(" "):
+                id_list_x.append(self.word_dic[word])
+            for word in text_y.split(" "):
+                id_list_y.append(self.word_dic[word])
+            id_data_x.append(id_list_x)
+            id_data_y.append(id_list_y)           
+            
+        self.id_data_x_len = max([len(text) for text in id_data_x])
+        
+        #padding
+        for text in id_data_x:
+            text.extend([pad_id] * (self.id_data_x_len - len(text)))
+        
+        self.id_data_x = torch.tensor(id_data_x)
+        self.id_data_y = torch.tensor(id_data_y)
+    
 def main():
+    """
     m_data = MultiReasoningData("/work01/aoki0903/PonderNet/multihop_experiment/datas/ponder_base.json")
     print(m_data.data_x[0])
     print([m_data.id_dic[int(c)] for c in m_data.data_x[0]])
     
     print(m_data.data_y[0])
     print([m_data.id_dic[int(c)] for c in m_data.data_y[0]])
+    """
     
+    t_data = SoftReasonersData("/home/aoki0903/sftp_sync/MyPonderNet/nlp_datasets/rule-reasoning-dataset-V2020.2.5.0/original/depth-3ext/train.jsonl")
+    d_data = SoftReasonersData("/home/aoki0903/sftp_sync/MyPonderNet/nlp_datasets/rule-reasoning-dataset-V2020.2.5.0/original/depth-3ext/dev.jsonl")
+    s_data = SoftReasonersData("/home/aoki0903/sftp_sync/MyPonderNet/nlp_datasets/rule-reasoning-dataset-V2020.2.5.0/original/depth-3ext/test.jsonl")
+    save_pass = "/home/aoki0903/sftp_sync/MyPonderNet/nlp_datasets/rule-reasoning-dataset-V2020.2.5.0/"
+    
+    make_word_dic([t_data.data_x,d_data.data_x,s_data.data_x],save_pass,init_word_dic={"<PAD>":0,"true":1,"false":2})
+    with open(save_pass + "word_dic.json", "r") as tf:
+        word_dic = json.load(tf)
+        #print(word_dic.items())
+        
+    make_id_dic(word_dic,save_pass)
+    with open(save_pass + "id_dic.json", "r") as tf:
+        id_dic = json.load(tf)
+        id_dic = {int(k):v for k,v in id_dic.items()}
+        print(id_dic.items())
+        
+    t_data.def_dic(word_dic,id_dic)
+    d_data.def_dic(word_dic,id_dic)
+    s_data.def_dic(word_dic,id_dic)
+    
+    t_data.text2id(pad_id=0)
+    d_data.text2id(pad_id=0)
+    s_data.text2id(pad_id=0)
+    
+    print([id_dic[word.item()] for word in t_data.id_data_x[0]])
+    print([id_dic[word.item()] for word in t_data.id_data_y[0]])
+    
+    
+    t_data = BABIData("/home/aoki0903/sftp_sync/MyPonderNet/nlp_datasets/babi/task_1.txt")
+    d_data = BABIData("/home/aoki0903/sftp_sync/MyPonderNet/nlp_datasets/babi/task_2.txt")
+    save_pass = "/home/aoki0903/sftp_sync/MyPonderNet/nlp_datasets/babi/"
+    
+    make_word_dic([t_data.data_x,d_data.data_x],save_pass,init_word_dic={"<PAD>":0})
+    
+    with open(save_pass + "word_dic.json", "r") as tf:
+        word_dic = json.load(tf)
+        #print(word_dic.items())
+        
+    make_id_dic(word_dic,save_pass)
+    with open(save_pass + "id_dic.json", "r") as tf:
+        id_dic = json.load(tf)
+        id_dic = {int(k):v for k,v in id_dic.items()}
+        #print(id_dic.items())
+    t_data.def_dic(word_dic,id_dic)
+    d_data.def_dic(word_dic,id_dic)
+    
+    t_data.text2id(pad_id=0)
+    d_data.text2id(pad_id=0)
+    
+    print([id_dic[word.item()] for word in t_data.id_data_x[0]])
+    print([id_dic[word.item()] for word in t_data.id_data_y[0]])
+        
+    
+
 
 if __name__ == '__main__':
     main()

@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 from util import make_tgt_mask
 from einops import rearrange, repeat
+import math
+
 
 class PonderTransformer(nn.Module):
     def __init__(
@@ -18,6 +20,7 @@ class PonderTransformer(nn.Module):
             allow_halting (bool, optional): If True, then the forward pass is allowed to halt before
                                             reaching the maximum steps. Defaults to False.
             nhead (int, optional): Defaults to 10.
+            num_token: kind of output tokens
         """
         super().__init__()
         self.max_steps = max_steps
@@ -27,16 +30,27 @@ class PonderTransformer(nn.Module):
         self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
         self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
         self.transformer_decoder_layer = nn.TransformerDecoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
+        self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=1)
+        self.transformer_decoder = nn.TransformerEncoder(self.transformer_decoder_layer, num_layers=1)
         self.output_layer = nn.Linear(emb_dim, self.num_token)
         self.lambda_layer = nn.Linear(emb_dim, 1)
 
         
-    def forward(self, x,true_y,tgt_mask=None):
-        src_key_padding_mask = (x == 0)
-        tgt_key_padding_mask = (true_y == 0)
+    def forward(self, x:torch.Tensor,true_y:torch.Tensor,tgt_mask:torch.Tensor=None,src_key_padding_mask = None,tgt_key_padding_mask=None):
+        """
+        Args:
+            x (torch.Tensor): input. shape of x is (batch_size, seq_len)
+            true_y (torch.Tensor): label
+            tgt_mask (torch.Tensor, optional): target_mask. Defaults to None.
+
+        Returns:
+            y (torch.Tensor): output. shape of y is (max,step, batch_size, seq_len, dim)
+            p (torch.Tensor): halt probability. shape of p is (max_step, batch_size)
+            halting_step (torch.Tensor): num of loop. shape of halting_step is (batch_size)
+        """
+        
         x = self.embedding(x)
         true_y = self.embedding(true_y)
-        
         
         batch_size, _, _ = x.shape
         device = x.device
@@ -53,7 +67,7 @@ class PonderTransformer(nn.Module):
         )
 
         for n in range(1, self.max_steps + 1):
-            x = self.transformer_encoder_layer(x,src_key_padding_mask=src_key_padding_mask)
+            x = self.transformer_encoder(x,src_key_padding_mask=src_key_padding_mask)
             if n == self.max_steps:
                 lambda_n = x.new_ones(batch_size)  # (batch_size,)
             else:
@@ -64,7 +78,7 @@ class PonderTransformer(nn.Module):
             #y_list.append(self.output_layer(x))  # (batch_size,)
             h = true_y.clone()
             for _ in range(n):
-                h = self.transformer_decoder_layer(tgt=h,memory=x,tgt_mask=tgt_mask,tgt_key_padding_mask=tgt_key_padding_mask)
+                h = self.transformer_decoder(tgt=h,memory=x,tgt_mask=tgt_mask,tgt_key_padding_mask=tgt_key_padding_mask)
             h = self.output_layer(h)
             y_list.append(h)
             
@@ -92,6 +106,195 @@ class PonderTransformer(nn.Module):
         return y, p, halting_step
 
 
+class PonderTransformerClassifier(nn.Module):
+    def __init__(
+        self,vocab_size ,emb_dim=300, max_steps=20, allow_halting=False,nhead=10,num_token=2
+    ):
+        """ PonderNet + Transformer
+
+        Args:
+            vocab_size (int): 
+            emb_dim (int, optional): Defaults to 300.
+            max_steps (int, optional): Defaults to 20.
+            allow_halting (bool, optional): If True, then the forward pass is allowed to halt before
+                                            reaching the maximum steps. Defaults to False.
+            nhead (int, optional): Defaults to 10.
+            num_token: kind of output tokens
+        """
+        super().__init__()
+        self.max_steps = max_steps
+        self.allow_halting = allow_halting
+        self.num_token = num_token
+        
+        self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
+        self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
+        self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=1)
+        self.output_layer = nn.Linear(emb_dim, self.num_token)
+        self.lambda_layer = nn.Linear(emb_dim, 1)
+
+        
+    def forward(self, x:torch.Tensor,src_key_padding_mask = None):
+        """
+        Args:
+            x (torch.Tensor): input. shape of x is (batch_size, seq_len)
+            true_y (torch.Tensor): label
+            tgt_mask (torch.Tensor, optional): target_mask. Defaults to None.
+
+        Returns:
+            y (torch.Tensor): output. shape of y is (max,step, batch_size, seq_len, dim)
+            p (torch.Tensor): halt probability. shape of p is (max_step, batch_size)
+            halting_step (torch.Tensor): num of loop. shape of halting_step is (batch_size)
+        """
+        
+        x = self.embedding(x)
+        
+        batch_size, _, _ = x.shape
+        device = x.device
+
+        un_halted_prob = x.new_ones(batch_size)
+
+        y_list = []
+        p_list = []
+
+        halting_step = torch.zeros(
+            batch_size,
+            dtype=torch.long,
+            device=device,
+        )
+
+        for n in range(1, self.max_steps + 1):
+            x = self.transformer_encoder(x,src_key_padding_mask=src_key_padding_mask)
+            if n == self.max_steps:
+                lambda_n = x.new_ones(batch_size)  # (batch_size,)
+            else:
+                
+                lambda_n = torch.sigmoid(self.lambda_layer(x[:,0]))[:, 0]  # (batch_size,)
+            
+            # Store releavant outputs
+            #y_list.append(self.output_layer(x))  # (batch_size,)
+            h = self.output_layer(x[:,0])
+            y_list.append(h)
+            
+            
+            
+            p_list.append(un_halted_prob * lambda_n)  # (batch_size,)
+
+            halting_step = torch.maximum(
+                n * (halting_step == 0)* torch.bernoulli(lambda_n).to(torch.long),
+                halting_step,
+            )
+
+            # Prepare for next iteration
+            un_halted_prob = un_halted_prob * (1 - lambda_n)
+
+            # Potentially stop if all samples halted
+            if self.allow_halting and (halting_step > 0).sum() == batch_size:
+                break
+        
+        y = torch.stack(y_list)
+        p = torch.stack(p_list)
+
+        return y, p, halting_step
+
+
+
+
+class PonderTransformerGenerater(nn.Module):
+    def __init__(
+        self,vocab_size ,emb_dim=128, max_steps=20, allow_halting=False,nhead=8,num_token=100
+    ):
+        """ PonderNet + Transformer
+
+        Args:
+            vocab_size (int): 
+            emb_dim (int, optional): Defaults to 300.
+            max_steps (int, optional): Defaults to 20.
+            allow_halting (bool, optional): If True, then the forward pass is allowed to halt before
+                                            reaching the maximum steps. Defaults to False.
+            nhead (int, optional): Defaults to 10.
+            num_token: kind of output tokens
+        """
+        super().__init__()
+        self.max_steps = max_steps
+        self.allow_halting = allow_halting
+        self.num_token = num_token
+        
+        self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
+        self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
+        self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=1)
+        self.lambda_layer = nn.Linear(emb_dim, 1)
+        self.output_layer = nn.Sequential(
+            nn.Linear(emb_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, self.num_token)
+        )
+
+        
+    def forward(self, x:torch.Tensor,src_key_padding_mask = None):
+        """
+        Args:
+            x (torch.Tensor): input. shape of x is (batch_size, seq_len)
+            true_y (torch.Tensor): label
+            tgt_mask (torch.Tensor, optional): target_mask. Defaults to None.
+
+        Returns:
+            y (torch.Tensor): output. shape of y is (max,step, batch_size, seq_len, dim)
+            p (torch.Tensor): halt probability. shape of p is (max_step, batch_size)
+            halting_step (torch.Tensor): num of loop. shape of halting_step is (batch_size)
+        """
+        
+        x = self.embedding(x)
+        
+        batch_size, _, _ = x.shape
+        device = x.device
+
+        un_halted_prob = x.new_ones(batch_size)
+
+        y_list = []
+        p_list = []
+
+        halting_step = torch.zeros(
+            batch_size,
+            dtype=torch.long,
+            device=device,
+        )
+
+        for n in range(1, self.max_steps + 1):
+            x = self.transformer_encoder(x,src_key_padding_mask=src_key_padding_mask)
+            if n == self.max_steps:
+                lambda_n = x.new_ones(batch_size)  # (batch_size,)
+            else:
+                
+                lambda_n = torch.sigmoid(self.lambda_layer(x[:,0]))[:, 0]  # (batch_size,)
+            
+            # Store releavant outputs
+            #y_list.append(self.output_layer(x))  # (batch_size,)
+            h = self.output_layer(x[:,0])
+            y_list.append(h)
+            
+            
+            
+            p_list.append(un_halted_prob * lambda_n)  # (batch_size,)
+
+            halting_step = torch.maximum(
+                n
+                * (halting_step == 0)
+                * torch.bernoulli(lambda_n).to(torch.long),
+                halting_step,
+            )
+
+            # Prepare for next iteration
+            un_halted_prob = un_halted_prob * (1 - lambda_n)
+
+            # Potentially stop if all samples halted
+            if self.allow_halting and (halting_step > 0).sum() == batch_size:
+                break
+        
+        y = torch.stack(y_list)
+        p = torch.stack(p_list)
+
+        return y, p, halting_step
+
 class ReconstructionLoss(nn.Module):
     """Weighted average of per step losses.
 
@@ -103,12 +306,10 @@ class ReconstructionLoss(nn.Module):
         each sample in the batch.
     """
 
-    def __init__(self, loss_func):
+    def __init__(self):
         super().__init__()
 
-        self.loss_func = loss_func
-
-    def forward(self, p, y_pred, y_true):
+    def forward(self, p, y_pred, y_true, pad_id=0):
         """Compute loss.
 
         Parameters
@@ -117,10 +318,10 @@ class ReconstructionLoss(nn.Module):
             Probability of halting of shape `(max_steps, batch_size)`.
 
         y_pred : torch.Tensor
-            Predicted outputs of shape `(max_steps, batch_size)`.
+            Predicted outputs of shape `(max,step, batch_size, seq_len, dim)`.
 
         y_true : torch.Tensor
-            True targets of shape `(batch_size,)`.
+            True targets of shape `(batch_size, seq_len)`.
 
         Returns
         -------
@@ -128,17 +329,27 @@ class ReconstructionLoss(nn.Module):
             Scalar representing the reconstruction loss. It is nothing else
             than a weighted sum of per step losses.
         """
-        max_steps, _ = p.shape
+        max_steps, batch_size = p.shape
         total_loss = p.new_tensor(0.0)
+        
+        p = rearrange(p, 'n b-> b n')
+        y_pred = rearrange(y_pred, 'n b s d-> b n s d')
+        
+        for p_n,y_pred_n,y_true_sequence in zip(p,y_pred,y_true):
+            y_true_sequence = y_true_sequence[1:].clone()
+            sample_loss = p.new_tensor(0.0)
+            
+            for p_item,y_pred_sequence in zip(p_n,y_pred_n):
+                y_pred_sequence  = nn.functional.softmax(y_pred_sequence[:-1].clone(),dim=-1)
+                p_correct = p.new_tensor(1.0)
+                
+                for y_pred_token,y_true_token in zip(y_pred_sequence,y_true_sequence):
+                    if y_true_token.item() != pad_id:
+                        p_correct = p_correct * y_pred_token[y_true_token]
+                sample_loss = sample_loss - p_item * torch.log(p_correct)
+            total_loss = total_loss + sample_loss
+        return total_loss/batch_size
 
-        for n in range(max_steps):
-            seq_len = y_true.shape[1]
-            arranged_y_true = rearrange(y_true.clone(), 'b s -> (b s)')
-            arranged_y_pred = rearrange(y_pred[n].clone(), 'b s d-> (b s) d')
-            loss_per_sample = p[n] * self.loss_func(arranged_y_pred,arranged_y_true) * seq_len  # (batch_size,)
-            total_loss = total_loss + loss_per_sample.mean()  # (1,)
-
-        return total_loss
 
 
 class RegularizationLoss(nn.Module):
@@ -155,10 +366,10 @@ class RegularizationLoss(nn.Module):
         Maximum number of pondering steps.
     """
 
-    def __init__(self, lambda_p, max_steps=20):
+    def __init__(self, lambda_p, device, max_steps=20):
         super().__init__()
 
-        p_g = torch.zeros((max_steps,))
+        p_g = torch.zeros((max_steps,)).to(device)
         not_halted = 1.0
 
         for k in range(max_steps):
@@ -189,6 +400,105 @@ class RegularizationLoss(nn.Module):
         )  # (batch_size, max_steps)
         return self.kl_div(p, p_g_batch)
 
+
+class ClassifyingReconstructionLoss(nn.Module):
+    """Weighted average of per step losses.
+
+    Parameters
+    ----------
+    loss_func : callable
+        Loss function that accepts `y_pred` and `y_true` as arguments. Both
+        of these tensors have shape `(batch_size,)`. It outputs a loss for
+        each sample in the batch.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, p, y_pred, y_true, pad_id=0):
+        """Compute loss.
+
+        Parameters
+        ----------
+        p : torch.Tensor
+            Probability of halting of shape `(max_steps, batch_size)`.
+
+        y_pred : torch.Tensor
+            Predicted outputs of shape `(max,step, batch_size, dim)`.
+
+        y_true : torch.Tensor
+            True targets of shape `(batch_size)`.
+
+        Returns
+        -------
+        loss : torch.Tensor
+            Scalar representing the reconstruction loss. It is nothing else
+            than a weighted sum of per step losses.
+        """
+        max_steps, batch_size = p.shape
+        total_loss = p.new_tensor(0.0)
+        
+        p = rearrange(p, 'n b-> b n')
+        y_pred = rearrange(y_pred, 'n b d-> b n d')
+        
+        for p_n,y_pred_n,y_true_token in zip(p,y_pred,y_true):
+            sample_loss = p.new_tensor(0.0)
+            for p_item,y_pred_token in zip(p_n,y_pred_n):
+                y_pred_token  = nn.functional.softmax(y_pred_token,dim=-1)
+                sample_loss = sample_loss - p_item * torch.log(y_pred_token[y_true_token-1])# yokunaikedo
+                
+            total_loss = total_loss + sample_loss
+            
+        return total_loss/batch_size
+
+class GeneratingReconstructionLoss(nn.Module):
+    """Weighted average of per step losses.
+
+    Parameters
+    ----------
+    loss_func : callable
+        Loss function that accepts `y_pred` and `y_true` as arguments. Both
+        of these tensors have shape `(batch_size,)`. It outputs a loss for
+        each sample in the batch.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, p, y_pred, y_true, pad_id=0):
+        """Compute loss.
+
+        Parameters
+        ----------
+        p : torch.Tensor
+            Probability of halting of shape `(max_steps, batch_size)`.
+
+        y_pred : torch.Tensor
+            Predicted outputs of shape `(max,step, batch_size, seq_len, dim)`.
+
+        y_true : torch.Tensor
+            True targets of shape `(batch_size, seq_len)`.
+
+        Returns
+        -------
+        loss : torch.Tensor
+            Scalar representing the reconstruction loss. It is nothing else
+            than a weighted sum of per step losses.
+        """
+        max_steps, batch_size = p.shape
+        total_loss = p.new_tensor(0.0)
+        
+        p = rearrange(p, 'n b-> b n')
+        y_pred = rearrange(y_pred, 'n b d-> b n d')
+        
+        for p_n,y_pred_n,y_true_token in zip(p,y_pred,y_true):
+            sample_loss = p.new_tensor(0.0)
+            
+            for p_item,y_pred_token in zip(p_n,y_pred_n):
+                y_pred_token  = nn.functional.softmax(y_pred_token,dim=-1)
+                sample_loss = sample_loss - p_item * torch.log(y_pred_token[y_true_token])
+            total_loss = total_loss + sample_loss
+        return total_loss/batch_size
 
 
 def main():
