@@ -1,9 +1,9 @@
 {
     "seed" : 616,
-    "number_of_symbols" : 26,
-    "max_number_of_question" : 100000,
-    "min_value" : 0,
-    "max_value" : 99,
+    "number_of_symbols" : 10,
+    "max_number_of_question" : 6250,
+    "min_value" : 1,
+    "max_value" : 3,
     "dtype" : "int",
     "output_type" : "ask_last_question",
 
@@ -21,15 +21,9 @@
 		},
 		
 		{
-		    "type" : ["Add", "Sub"],
+		    "type" : ["Add","Sub","Mul"],
 		    "format" : [[0, "num"]],
-		    "commutative" : true
-		},
-		
-		{
-		    "type" : ["Add", "Sub"],
-		    "format" : [[1, "num"]],
-		    "commutative" : true
+		    "commutative" : false
 		}
 		
 	    ],
@@ -38,7 +32,7 @@
 	    "operator" : {
 		"type" : ["Check"],
 		"selection_probabilities" : [1.0], 
-		"format" : [2]
+		"format" : [1]
 	    }
 	}
     ]

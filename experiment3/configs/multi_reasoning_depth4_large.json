@@ -1,16 +1,15 @@
 {
     "seed" : 616,
     "number_of_symbols" : 26,
-    "max_number_of_question" : 10,
+    "max_number_of_question" : 1000000,
     "min_value" : 0,
-    "max_value" : 9,
+    "max_value" : 99,
     "dtype" : "int",
     "output_type" : "ask_last_question",
 
 
     "generation_rules" : [
-
-
+	
 	{
 	    "type" : "template",
 	    "selection_probability" : 1,
@@ -22,40 +21,31 @@
 		},
 		
 		{
-		    "type" : ["AddSubstitution", "SubSubstitution"],
+		    "type" : ["Add", "Sub"],
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
-
+		
 		{
-		    "type" : ["AddSubstitution", "SubSubstitution"],
+		    "type" : ["Add", "Sub"],
 		    "format" : [[1, "num"]],
 		    "commutative" : true
 		},
-
+		
 		{
-		    "type" : ["AddSubstitution", "SubSubstitution"],
+		    "type" : ["Add", "Sub"],
 		    "format" : [[2, "num"]],
 		    "commutative" : true
-		},
-
-		{
-		    "type" : ["AddSubstitution", "SubSubstitution"],
-		    "format" : [[3, "num"]],
-		    "commutative" : true
 		}
-
 		
 	    ],
 	
     
 	    "operator" : {
 		"type" : ["Check"],
-		"selection_probabilities" : [1], 
-		"arg_pos" : [-1],
-		"commutative" : true
+		"selection_probabilities" : [1.0], 
+		"format" : [3]
 	    }
 	}
-
     ]
 }

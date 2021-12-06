@@ -64,7 +64,6 @@ def vanilla_train(
             tgt_mask = make_tgt_mask(true_y.shape[1]).to(device)
             src_key_padding_mask = (x == pad_id)
             tgt_key_padding_mask = (true_y == pad_id)
-
             optimizer.zero_grad()
             pred_y = model(x, true_y, tgt_mask=tgt_mask,
                            src_key_padding_mask=src_key_padding_mask, tgt_key_padding_mask=tgt_key_padding_mask)

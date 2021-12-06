@@ -12,7 +12,7 @@ sys.path.append(os.pardir)
 
 from ponder_transformer import PonderTransformer
 from vanilla_transformer import Transformer
-from datasets import MultiReasoningData
+from datasets import MultiReasoningGenBERTData
 import torch.nn.functional as F
 
 from torch.utils.tensorboard import SummaryWriter
@@ -36,13 +36,14 @@ def main(args):
         log_dir = log_dir + '/args' + args_str
     writer = SummaryWriter(log_dir=log_dir, comment=args_str)
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device(args.device if torch.cuda.is_available() else "cpu")
+
     epochs = args.epochs
     batch_size = args.batch_size
     beta = args.beta
     ponder_model = strtobool(args.ponder_model)
 
-    all_data = MultiReasoningData(args.json_pass)  # if文で切り替える?,testはこれを分割して使用
+    all_data = MultiReasoningGenBERTData(args.json_pass)  # if文で切り替える?,testはこれを分割して使用
     all_data_len = len(all_data)  # n_samples is 60000
     train_len = int(all_data_len * 0.8)
     train_indices = list(range(0, train_len))  # [0,1,.....47999]
@@ -115,7 +116,9 @@ def main(args):
                 model=model,
                 device=device,
                 pad_id=pad_id,
-                sep_id=sep_id
+                sep_id=sep_id,
+                load_pass=load_pass,
+                
             )
     else:
         if strtobool(args.train):
@@ -155,7 +158,9 @@ def main(args):
                 model=model,
                 device=device,
                 pad_id=pad_id,
-                sep_id=sep_id
+                sep_id=sep_id,
+                load_pass=load_pass,
+                
             )
 
 
@@ -166,6 +171,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_step', default=3, type=int)
     parser.add_argument('--seed', default=66, type=int)
     parser.add_argument('--beta', default=1.0, type=float)
+    parser.add_argument('--device', default="cuda:0")
     parser.add_argument(
         '--json_pass', default="/work01/aoki0903/PonderNet/multihop_experiment/datas/ponder_base.json")
     parser.add_argument(

@@ -24,12 +24,6 @@
 		    "type" : ["Add", "Sub"],
 		    "format" : [[0, "num"]],
 		    "commutative" : true
-		},
-		
-		{
-		    "type" : ["Add", "Sub"],
-		    "format" : [[1, "num"]],
-		    "commutative" : true
 		}
 		
 	    ],
@@ -38,7 +32,7 @@
 	    "operator" : {
 		"type" : ["Check"],
 		"selection_probabilities" : [1.0], 
-		"format" : [2]
+		"format" : [1]
 	    }
 	}
     ]

@@ -2,14 +2,14 @@ import argparse
 
 import torch
 import torch.nn as nn
-from util import make_tgt_mask
+from util import make_tgt_mask, PositionalEncoder
 from einops import rearrange, repeat
 import math
 
 
 class PonderTransformer(nn.Module):
     def __init__(
-        self,vocab_size ,emb_dim=300, max_steps=20, allow_halting=False,nhead=10,num_token=100
+        self,vocab_size ,emb_dim=512, max_steps=20, allow_halting=False,nhead=8,num_token=100
     ):
         """ PonderNet + Transformer
 
@@ -28,11 +28,16 @@ class PonderTransformer(nn.Module):
         self.num_token = num_token
         
         self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
+        self.pos_encoder = PositionalEncoder(d_model=emb_dim)
         self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
         self.transformer_decoder_layer = nn.TransformerDecoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=1)
         self.transformer_decoder = nn.TransformerEncoder(self.transformer_decoder_layer, num_layers=1)
-        self.output_layer = nn.Linear(emb_dim, self.num_token)
+        self.output_layer = nn.Sequential(
+            nn.Linear(emb_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, self.num_token),
+        )
         self.lambda_layer = nn.Linear(emb_dim, 1)
 
         
@@ -51,6 +56,9 @@ class PonderTransformer(nn.Module):
         
         x = self.embedding(x)
         true_y = self.embedding(true_y)
+        x = self.pos_encoder(x)
+        true_y = self.pos_encoder(true_y)
+
         
         batch_size, _, _ = x.shape
         device = x.device
@@ -87,11 +95,7 @@ class PonderTransformer(nn.Module):
             p_list.append(un_halted_prob * lambda_n)  # (batch_size,)
 
             halting_step = torch.maximum(
-                n
-                * (halting_step == 0)
-                * torch.bernoulli(lambda_n).to(torch.long),
-                halting_step,
-            )
+n*(halting_step == 0)*torch.bernoulli(lambda_n).to(torch.long),halting_step,)
 
             # Prepare for next iteration
             un_halted_prob = un_halted_prob * (1 - lambda_n)
@@ -108,7 +112,7 @@ class PonderTransformer(nn.Module):
 
 class PonderTransformerClassifier(nn.Module):
     def __init__(
-        self,vocab_size ,emb_dim=300, max_steps=20, allow_halting=False,nhead=10,num_token=2
+        self,vocab_size ,emb_dim=512, max_steps=20, allow_halting=False,nhead=8,num_token=1
     ):
         """ PonderNet + Transformer
 
@@ -127,9 +131,14 @@ class PonderTransformerClassifier(nn.Module):
         self.num_token = num_token
         
         self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
+        self.pos_encoder = PositionalEncoder(d_model=emb_dim)
         self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=1)
-        self.output_layer = nn.Linear(emb_dim, self.num_token)
+        self.output_layer = nn.Sequential(
+            nn.Linear(emb_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, self.num_token)
+        )
         self.lambda_layer = nn.Linear(emb_dim, 1)
 
         
@@ -147,6 +156,8 @@ class PonderTransformerClassifier(nn.Module):
         """
         
         x = self.embedding(x)
+        x = self.pos_encoder(x)
+
         
         batch_size, _, _ = x.shape
         device = x.device
@@ -219,7 +230,8 @@ class PonderTransformerGenerater(nn.Module):
         self.allow_halting = allow_halting
         self.num_token = num_token
         
-        self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
+        self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim,padding_idx=0)
+        self.pos_encoder = PositionalEncoder(d_model=emb_dim)
         self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=1)
         self.lambda_layer = nn.Linear(emb_dim, 1)
@@ -244,6 +256,7 @@ class PonderTransformerGenerater(nn.Module):
         """
         
         x = self.embedding(x)
+        x = self.pos_encoder(x)
         
         batch_size, _, _ = x.shape
         device = x.device
@@ -264,7 +277,6 @@ class PonderTransformerGenerater(nn.Module):
             if n == self.max_steps:
                 lambda_n = x.new_ones(batch_size)  # (batch_size,)
             else:
-                
                 lambda_n = torch.sigmoid(self.lambda_layer(x[:,0]))[:, 0]  # (batch_size,)
             
             # Store releavant outputs
@@ -275,13 +287,8 @@ class PonderTransformerGenerater(nn.Module):
             
             
             p_list.append(un_halted_prob * lambda_n)  # (batch_size,)
-
-            halting_step = torch.maximum(
-                n
-                * (halting_step == 0)
-                * torch.bernoulli(lambda_n).to(torch.long),
-                halting_step,
-            )
+            
+            halting_step = torch.maximum(n*(halting_step == 0)*torch.bernoulli(lambda_n).to(torch.long),halting_step,)
 
             # Prepare for next iteration
             un_halted_prob = un_halted_prob * (1 - lambda_n)
@@ -334,7 +341,6 @@ class ReconstructionLoss(nn.Module):
         
         p = rearrange(p, 'n b-> b n')
         y_pred = rearrange(y_pred, 'n b s d-> b n s d')
-        
         for p_n,y_pred_n,y_true_sequence in zip(p,y_pred,y_true):
             y_true_sequence = y_true_sequence[1:].clone()
             sample_loss = p.new_tensor(0.0)
@@ -403,7 +409,6 @@ class RegularizationLoss(nn.Module):
 
 class ClassifyingReconstructionLoss(nn.Module):
     """Weighted average of per step losses.
-
     Parameters
     ----------
     loss_func : callable
@@ -417,18 +422,14 @@ class ClassifyingReconstructionLoss(nn.Module):
 
     def forward(self, p, y_pred, y_true, pad_id=0):
         """Compute loss.
-
         Parameters
         ----------
         p : torch.Tensor
             Probability of halting of shape `(max_steps, batch_size)`.
-
         y_pred : torch.Tensor
             Predicted outputs of shape `(max,step, batch_size, dim)`.
-
         y_true : torch.Tensor
             True targets of shape `(batch_size)`.
-
         Returns
         -------
         loss : torch.Tensor
@@ -448,7 +449,6 @@ class ClassifyingReconstructionLoss(nn.Module):
                 sample_loss = sample_loss - p_item * torch.log(y_pred_token[y_true_token-1])# yokunaikedo
                 
             total_loss = total_loss + sample_loss
-            
         return total_loss/batch_size
 
 class GeneratingReconstructionLoss(nn.Module):
@@ -464,6 +464,7 @@ class GeneratingReconstructionLoss(nn.Module):
 
     def __init__(self):
         super().__init__()
+        self.loss_func = nn.CrossEntropyLoss()
 
     def forward(self, p, y_pred, y_true, pad_id=0):
         """Compute loss.
@@ -489,17 +490,16 @@ class GeneratingReconstructionLoss(nn.Module):
         total_loss = p.new_tensor(0.0)
         
         p = rearrange(p, 'n b-> b n')
+        #soft_p = nn.functional.softmax(p.clone(),dim=-1)
         y_pred = rearrange(y_pred, 'n b d-> b n d')
         
         for p_n,y_pred_n,y_true_token in zip(p,y_pred,y_true):
             sample_loss = p.new_tensor(0.0)
-            
-            for p_item,y_pred_token in zip(p_n,y_pred_n):
-                y_pred_token  = nn.functional.softmax(y_pred_token,dim=-1)
-                sample_loss = sample_loss - p_item * torch.log(y_pred_token[y_true_token])
+            for i, (p_item,y_pred_token) in enumerate(zip(p_n,y_pred_n)):
+                cross_loss  = self.loss_func(torch.unsqueeze(y_pred_token,dim=0),torch.unsqueeze(y_true_token,dim=0))
+                sample_loss = sample_loss + p_item * cross_loss
             total_loss = total_loss + sample_loss
         return total_loss/batch_size
-
 
 def main():
     vocab_size = 10

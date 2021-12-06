@@ -8,17 +8,17 @@ WOKE="/home/aoki0903/sftp_sync/MyPonderNet/nlp_datasets/rule-reasoning-dataset-V
 
 PYTHONHASHSEED=0 python run.py \
     --data_pass=$WOKE/$1 \
-    --epochs=100000 \
+    --epochs=300 \
     --max_step=5 \
-    --batch_size=64 \
-    --beta=0.1 \
+    --batch_size=32 \
+    --beta=0.01 \
     --seed=6 \
     --print_sample_num=3 \
     --valid=true \
-    --log_dir=runs/ponder/step5 \
+    --log_dir=runs/ponder/depth0 \
     --ponder_model=true \
     --train=true \
-    --device=cuda:0
+    --device=cuda:2
 
 
-#./run_ponder.sh depth-3ext
+#./run_ponder.sh depth-0

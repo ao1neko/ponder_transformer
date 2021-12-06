@@ -173,13 +173,18 @@ def vanilla_print_sample(
         x_item = torch.unsqueeze(x_item.to(device), 0)
         true_y_item = torch.unsqueeze(true_y_item.to(device), 0)
         print(f"x:{[id2word_dic[id] for id in x_item[0].tolist()]}")
-        print(f"true_y:{[id2word_dic[id] for id in true_y_item[0].tolist()]}")
+        print(f"true_y:{[id2word_dic[true_y_item[0].item()]]}")
 
         src_key_padding_mask = (x_item == pad_id)
 
         pred_y = model(x_item,
                             src_key_padding_mask=src_key_padding_mask)
+        id = torch.sigmoid(pred_y[0]).item()
+        if id > 0.5 :
+            id = 2
+        else: 
+            id = 1
         print(
-            f"pred_y:{id2word_dic[torch.argmax(pred_y[0],dim=-1).item()+1]}")
+            f"pred_y:{id2word_dic[id]}")
 
 

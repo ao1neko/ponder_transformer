@@ -11,3 +11,5 @@ PYTHONHASHSEED=0 python $NUMERICAL_DIR/make_drop_format_data.py \
     $WOKE01/datas/$1.json
 
 #./run_makedata.sh ponder_base
+#./run_makedata.sh multi_reasoning_depth2
+#./run_makedata.sh multi_reasoning_depth2_mul3_sizeconst_small

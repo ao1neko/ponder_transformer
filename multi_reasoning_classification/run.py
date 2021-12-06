@@ -1,12 +1,9 @@
 import argparse
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
 from distutils.util import strtobool
 import random
-import numpy as np
 import datetime
 from torch.utils.data.dataset import Subset
 import sys
@@ -15,15 +12,13 @@ sys.path.append(os.pardir)
 
 from ponder_transformer import PonderTransformerGenerater
 from vanilla_transformer import TransformerGenerater
-from datasets import BABIData
+from datasets import MultiReasoningData,ConcatedMultiReasoningData
 import torch.nn.functional as F
-import json
-
 
 from torch.utils.tensorboard import SummaryWriter
 from run_ponder_transformer import ponder_train, ponder_test, ponder_print_sample
 from run_vanilla_transformer import vanilla_train, vanilla_test, vanilla_print_sample
-from util import make_word_dic,make_id_dic
+
 
 def main(args):
     random.seed(args.seed)
@@ -32,39 +27,30 @@ def main(args):
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     torch.backends.cudnn.deterministic = True
-
+    #torch.set_printoptions(edgeitems=10)
+    
     daytime = str(datetime.datetime.fromtimestamp(0))
     args_str = '_'+','.join([arg+"="+str(getattr(args, arg))
-                            for arg in vars(args) if arg not in ['data_pass', 'load_pass', 'log_dir']])
+                            for arg in vars(args) if arg not in ['json_pass', 'load_pass', 'log_dir']])
     log_dir = args.log_dir
     if log_dir is not None:
         log_dir = log_dir + '/args' + args_str
     writer = SummaryWriter(log_dir=log_dir, comment=args_str)
+
     device = torch.device(args.device if torch.cuda.is_available() else "cpu")
-    print(device)
-    
+
     epochs = args.epochs
     batch_size = args.batch_size
     beta = args.beta
     ponder_model = strtobool(args.ponder_model)
-
-    all_data = BABIData(args.data_pass)  # if文で切り替える?,testはこれを分割して使用
-    save_pass = "/home/aoki0903/sftp_sync/MyPonderNet/nlp_datasets/babi/" 
-    
-    make_word_dic([all_data.data_x], save_pass,
-                  init_word_dic={"<PAD>":0})
-    with open(save_pass + "word_dic.json", "r") as tf:
-        word_dic = json.load(tf)
-        # print(word_dic.items())
-
-    make_id_dic(word_dic, save_pass)
-    with open(save_pass + "id_dic.json", "r") as tf:
-        id_dic = json.load(tf)
-        id_dic = {int(k): v for k, v in id_dic.items()}
-        # print(id_dic.items())
-    
-    all_data.def_dic(word_dic,id_dic)
-    all_data.text2id(pad_id=0)
+    concated = strtobool(args.concated)
+    if concated:
+        pass_list = ["multi_reasoning_depth2.json","multi_reasoning_depth3.json"]
+        all_data = ConcatedMultiReasoningData([args.json_pass + x for x in pass_list])
+        all_data = MultiReasoningData("multi_reasoning_depth2.json")
+        all_data = MultiReasoningData("multi_reasoning_depth3.json")
+    else:
+        all_data = MultiReasoningData(args.json_pass)  # if文で切り替える?,testはこれを分割して使用
     
     all_data_len = len(all_data)  # n_samples is 60000
     train_len = int(all_data_len * 0.8)
@@ -82,15 +68,16 @@ def main(args):
                                                shuffle=True)
     vocab_size = all_data.vocab_size
     max_step = args.max_step
+    emb_dim = args.emb_dim
+
     if ponder_model:
-        model = PonderTransformerGenerater(vocab_size=vocab_size, allow_halting=False,
+        model = PonderTransformerGenerater(vocab_size=vocab_size, allow_halting=False,emb_dim=emb_dim,
                                   max_steps=max_step, num_token=vocab_size).to(device)
     else:
-        model = TransformerGenerater(vocab_size=vocab_size,
+        model = TransformerGenerater(vocab_size=vocab_size,emb_dim=emb_dim,
                             num_token=vocab_size, num_layers=max_step).to(device)
-    
-    optimizer = optim.Adam(model.parameters(), lr=0.0003,)
 
+    optimizer = optim.Adam(model.parameters(), lr=args.lr,)
 
     sep_id = all_data.word_dic["<SEP>"]
     pad_id = all_data.word_dic["<PAD>"]
@@ -114,7 +101,7 @@ def main(args):
                 pad_id=pad_id,
                 sep_id=sep_id,
                 writer=writer,
-                modelsave_pass='best_ponder_models/' + daytime + args_str
+                modelsave_pass= load_pass + args_str
             )
 
         if strtobool(args.test):
@@ -126,20 +113,22 @@ def main(args):
                 device=device,
                 load_pass=load_pass,
                 pad_id=pad_id,
-                sep_id=sep_id
+                sep_id=sep_id,
+                concated = concated
             )
 
         if args.print_sample_num > 0:
             print_sample_num = args.print_sample_num
             ponder_print_sample(
-                x=all_data.id_data_x[:print_sample_num],
-                true_y=all_data.id_data_y[:print_sample_num],
+                x=all_data.data_x[:print_sample_num],
+                true_y=all_data.data_y[:print_sample_num],
                 id2word_dic=all_data.id_dic,
                 model=model,
                 device=device,
                 pad_id=pad_id,
                 sep_id=sep_id,
                 load_pass=load_pass,
+                
             )
     else:
         if strtobool(args.train):
@@ -173,8 +162,8 @@ def main(args):
         if args.print_sample_num > 0:
             print_sample_num = args.print_sample_num
             vanilla_print_sample(
-                x=all_data.id_data_x[:print_sample_num],
-                true_y=all_data.id_data_y[:print_sample_num],
+                x=all_data.data_x[:print_sample_num],
+                true_y=all_data.data_y[:print_sample_num],
                 id2word_dic=all_data.id_dic,
                 model=model,
                 device=device,
@@ -191,10 +180,11 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', default=128, type=int)
     parser.add_argument('--max_step', default=3, type=int)
     parser.add_argument('--seed', default=66, type=int)
-    parser.add_argument('--device', default="cuda:0")
+    parser.add_argument('--emb_dim', default=128, type=int)
     parser.add_argument('--beta', default=1.0, type=float)
+    parser.add_argument('--device', default="cuda:0")
     parser.add_argument(
-        '--data_pass', default="/home/aoki0903/sftp_sync/MyPonderNet/nlp_datasets/babi/task_1.txt")
+        '--json_pass', default="/work01/aoki0903/PonderNet/multihop_experiment/datas/ponder_base.json")
     parser.add_argument(
         '--load_pass', default=None)
     parser.add_argument(
@@ -204,5 +194,7 @@ if __name__ == '__main__':
     parser.add_argument('--valid', default='false')
     parser.add_argument('--print_sample_num', default=0, type=int)
     parser.add_argument('--ponder_model', default='true')
+    parser.add_argument('--concated', default='false')
+    parser.add_argument('--lr',default=0.00003,type=float)
     args = parser.parse_args()
     main(args)

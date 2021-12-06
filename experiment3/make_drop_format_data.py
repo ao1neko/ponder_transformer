@@ -35,7 +35,7 @@ def passage_questuion_generater(config_filepath):
     numeric_data_ganerator = NumericDataGenarator(config_filepath=config_filepath)
 
     counter = count()
-    for passage, question, answer in numeric_data_ganerator.generate_data():
+    for passage, question, answer in numeric_data_ganerator():
         new_passage_question = deepcopy(template_dict)
         new_passage_question["passage"] = passage
 

@@ -1,128 +1,143 @@
-from function_wrapper import FunctionWrapper
-import random
-
-# 定義したクラスを追加してください. (operationとして用いない場合は不要です. )
-__all__ = ["Add", "Sub", "Mult", "Max", "Min", "WhoMax", "WhoMin", "Condition", "Check", "NoQuestion"]
+from basic_operator import BasicOperator
 
 
-# クラス名はconfigに設定する名前と同一にしてください.
-class Max(FunctionWrapper):
-    """
-    最終的な演算の内容を表すクラスです. 
-    必ずFunctionWrapperを継承してください. 
-    """
+"""
+ 定義したクラスを必ず追加してください. (operaterとして用いない場合は不要です. )
+ """
+__all__ = ["Substitution", "Check", "Add", "Sub","Mul", "WhoMax", "PseudoAdd", "NoQuestion", "Max"]
+
+class Substitution(BasicOperator):
+    arg_formats = ["num", "var"]
+
+    def __call__(self, arg_list, state):
+        assert len(arg_list) == 1, "lehgth of arg_list must be 1 when you use \"Substitution\"."
+        return self.get_values(arg_list, state)[0]
     
-    def func(**kwargs):
-        """
-        関数の計算内容を記述する部分です. 
-        kwargsには, 変数の名前とその値がペアになった辞書が入力されます. 
-        出力は, 数字 or stringにするのが無難です. 厳密にはここで出力された内容に, str関数を適応したものが, データセットのanswerとなります. 
-        """
-        return max(kwargs.values())
 
-    def get_representaion(*symbols):
-        """
-        関数のデータセット内での表現方法(表示形式)を出力してください. 
-        入力symbolsは, 関数に入力された変数の名前です. 
-        例えば, pythonの内部的な計算ではAdd.func(A, B)などと計算が行われますが, データセットではA + Bと表現したいときもあると思うので, その設定のために用いられます. 
-        """
-        
-        return "Max({})".format(", ".join(symbols))
+    def get_representation(self, arg_list, state):
+        return arg_list[0]
 
-
-
-class Min(FunctionWrapper):
-    def func(**kwargs):
-        return min(kwargs.values())
-
-    def get_representaion(*symbols):
-        return "Min({})".format(", ".join(symbols))
-
-
-class Add(FunctionWrapper):
-    def func(**kwargs):
-        return sum(kwargs.values())
-
-    def get_representaion(*symbols):
-        return "+".join(symbols)
-
-
-class Sub(FunctionWrapper):
-    def func(**kwargs):
-        return Sub.func_nest(lambda a, b: a - b, kwargs.values())
     
-    def get_representaion(*symbols):
-        return "-".join(symbols)
+class Check(Substitution):
+    arg_formats = ["var"]
 
-    def func_nest(f, iterable):
+    
+class Add(BasicOperator):
+    """
+    f"*num:{n}", f"*var:{n}", f"*num_var:{n}"は(n >= 1)個以上の任意の個数の数値, 変数, 数値と変数の両方を受け取れることを示すワイルドカード的なものです.
+    
+    例:
+
+    arg_formats = ["*num:1"]: 1個以上の任意の個数の数値
+                = ["num", ("num", "num"), ("num", "num", "num"),...]
+    arg_formats = ["*num_var:2"] : 2個以上の任意の個数の数値 or 変数
+                = [("num", "var"), ...]
+    (変数と数値が引数に混ざっていてもOKです.)
+
+    arg_formats = ["*num:1", "*var:1"] : 1個以上の任意の個数の数値 or 1個以上の任意の個数の変数
+                = ["num", ("num", "num"), ,... , "var", ("var", "var")]
+    (変数と数値が混ざっているものは受け取れないことを意味します. あまり使い道はないかもしれませんが,  一応そういう仕様にします. )
+    
+
+    現状, このワイルドカードは単体でしか用いることができないです. 
+    こういった使い方はできないです. 
+    ダメな例 : 
+    arg_formats = [("*var", "num")] : 1個以上の任意の個数の変数と, 1つの数値
+    
+    もちろん, 今まで通り個別に形式を指定できます. 
+    例：
+    arg_formats = [("num", "num"), ("var", "num"), ("num", "var"), ("var", "var")]
+ 
+    """
+    arg_formats = ["*num_var:2"]
+    
+    def __call__(self, arg_list, state):
+        #assert len(arg_list) == 2
+        return sum(self.get_values(arg_list, state))
+    
+
+    def get_representation(self, arg_list, state):
+        return " + ".join(map(str, arg_list))
+
+
+
+class Sub(BasicOperator):
+    arg_formats = ["*num_var:2"]
+    
+    def __call__(self, arg_list, state):
+        #assert len(arg_list) == 2
+        return self.func_nest(lambda a, b: a - b, self.get_values(arg_list, state))
+    
+
+    def get_representation(self, arg_list, state):
+        return " - ".join(map(str, arg_list))
+
+
+    def func_nest(self, f, iterable):
         input_iter = iter(iterable)
         temp_value = next(input_iter)
         for v in input_iter:
             temp_value = f(temp_value, v)
         return temp_value
 
-
-class Mult(FunctionWrapper):
-    def func(**kwargs):
-        return Mult.func_nest(lambda a, b: a * b, kwargs.values())
+class Mul(BasicOperator):
+    arg_formats = ["*num_var:2"]
     
-    def get_representaion(*symbols):
-        return "-".join(symbols)
+    def __call__(self, arg_list, state):
+        #assert len(arg_list) == 2
+        return self.func_nest(lambda a, b: a * b, self.get_values(arg_list, state))
+    
 
-    def func_nest(f, iterable):
+    def get_representation(self, arg_list, state):
+        return " * ".join(map(str, arg_list))
+
+    def func_nest(self, f, iterable):
         input_iter = iter(iterable)
         temp_value = next(input_iter)
         for v in input_iter:
             temp_value = f(temp_value, v)
         return temp_value
 
+class Max(BasicOperator):
+    arg_formats = ["*num_var:1"]
     
+    def __call__(self, arg_list, state):
+        return max(self.get_values(arg_list, state))
     
-class WhoMax(FunctionWrapper):
-    def func(**kwargs):
-        return sorted(kwargs.items(), key = lambda x: x[1])[-1][0]
-        
 
-    def get_representaion(*symbols):
-        return "WhoMax({})".format(", ".join(symbols))
+    def get_representation(self, arg_list, state):
+        return "max({})".format(",".join(map(str, arg_list)))
 
-class WhoMin(FunctionWrapper):
-    def func(**kwargs):
-        return sorted(kwargs.items(), key = lambda x: x[1])[0][0]
-        
-
-    def get_representaion(*symbols):
-        return "WhoMax({})".format(", ".join(symbols))
 
 
     
-class Condition(FunctionWrapper):
-
-    threshold = None
     
-    def func(**kwargs):
-        Condition.threshold = random.randrange(5)
-        return "{" + ", ".join(s for s, v in kwargs.items() if v >= Condition.threshold) + "}"
-        
+class WhoMax(BasicOperator):
+    arg_formats = ["*var:1"]
+    
+    def __call__(self, arg_list, state):
+        return sorted(zip(arg_list, self.get_values(arg_list, state)), key=lambda x: x[1], reverse=True)[0][0]
+    
 
-    def get_representaion(*symbols):
-        return "{X | X >= " + str(Condition.threshold) + "}"
+    def get_representation(self, arg_list, state):
+        return "who_max({})".format(",".join(map(str, arg_list)))
+    
+
+    
+class PseudoAdd(Add):
+    
+    def get_representation(self, arg_list, state):
+        return " + ".join(map(str, self.get_values(arg_list, state)))
 
 
 
-class Check(FunctionWrapper):
-    def func(**kwargs):
-        assert len(kwargs)==1, "lejgth of kwargs at Check must be 1."
-        return next(iter(kwargs.values()))
-
-    def get_representaion(*symbols):
-        return symbols[0]
-
-class NoQuestion(FunctionWrapper):
+class NoQuestion(BasicOperator):
     arg_formats = []
-    
-    def func():
-        return None
 
-    def get_representaion(arg_list, state):
+    def __call__(self, arg_list, state):
+        assert len(arg_list) == 0 and len(state) == 0, "This operator has no arguments."
+        return None
+    
+
+    def get_representation(self, arg_list, state):
         return None

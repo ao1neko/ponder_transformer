@@ -6,7 +6,6 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from ponder_transformer import GeneratingReconstructionLoss, RegularizationLoss
-from util import make_tgt_mask
 import torch.nn.functional as F
 from einops import rearrange
 from torch.utils.tensorboard import SummaryWriter
@@ -22,18 +21,12 @@ def calculate_acc(pred_y:torch.Tensor,true_y:torch.Tensor,h:torch.Tensor,pad_id=
     """
   
     count = 0
-    pred_y = rearrange(pred_y, 'n b s d-> b n s d')
+    pred_y = rearrange(pred_y, 'n b d-> b n d')
 
-    for pred_y_n,true_y_sequence,h_item in zip(pred_y,true_y,h):
-        pred_y_sequence = pred_y_n[h_item.item()-1]
-        
-        true_y_sequence = true_y_sequence[1:]
-        pred_y_sequence = torch.argmax(pred_y_sequence[:-1], dim=-1)
-        
-        flag = False
-        for pred_y_token,true_y_token in zip(pred_y_sequence,true_y_sequence):
-            if true_y_token.item() != pad_id and pred_y_token.item() != true_y_token.item(): flag = True
-        if flag == False : count += 1
+    for pred_y_n,true_y_token,h_item in zip(pred_y,true_y,h):
+        pred_y_token = pred_y_n[h_item.item()-1]
+        pred_y_token = torch.argmax(pred_y_token, dim=-1)
+        if pred_y_token.item() == true_y_token.item(): count += 1
 
     return count
 
@@ -68,9 +61,7 @@ def ponder_train(
         for x, true_y in train_loader:
             x = x.to(device)
             true_y = true_y.to(device)
-            tgt_mask = make_tgt_mask(true_y.shape[1]).to(device)
             src_key_padding_mask = (x == pad_id)
-            tgt_key_padding_mask = (true_y == pad_id)
 
             optimizer.zero_grad()
             pred_y, p, h = model(x,
@@ -100,9 +91,7 @@ def ponder_train(
                 for x, true_y in valid_loader:
                     x = x.to(device)
                     true_y = true_y.to(device)
-                    tgt_mask = make_tgt_mask(true_y.shape[1]).to(device)
                     src_key_padding_mask = (x == pad_id)
-                    tgt_key_padding_mask = (true_y == pad_id)
 
                     pred_y, p, h = model(
                         x,src_key_padding_mask=src_key_padding_mask)
@@ -159,9 +148,7 @@ def ponder_test(
         for x, true_y in test_loader:
             x = x.to(device)
             true_y = true_y.to(device)
-            tgt_mask = make_tgt_mask(true_y.shape[1]).to(device)
             src_key_padding_mask = (x == pad_id)
-            tgt_key_padding_mask = (true_y == pad_id)
 
             pred_y, p, h = model(x,
                                  src_key_padding_mask=src_key_padding_mask)
@@ -216,12 +203,11 @@ def ponder_print_sample(
         print(f"x:{[id2word_dic[id] for id in x_item[0].tolist()]}")
         print(f"true_y:{[id2word_dic[id] for id in true_y_item[0].tolist()]}")
 
-        tgt_mask = make_tgt_mask(true_y_item.shape[1]).to(device)
         src_key_padding_mask = (x_item == pad_id)
         tgt_key_padding_mask = (true_y_item == pad_id)
 
-        pred_y, p, h = model(x_item, true_y_item, tgt_mask=tgt_mask,
-                            src_key_padding_mask=src_key_padding_mask, tgt_key_padding_mask=tgt_key_padding_mask)
+        pred_y, p, h = model(x_item,
+                            src_key_padding_mask=src_key_padding_mask)
         print(
             f"pred_y:{['<CLS>']+[id2word_dic[id] for id in torch.argmax(pred_y[h[0]-1][0],dim=-1)[:-1].tolist()]}")
         print(f"halting step:{h[0]}")

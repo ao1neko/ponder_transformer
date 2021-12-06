@@ -1,154 +1,123 @@
+import os
 import json
 import itertools
-import random
 import string
 import argparse
 from copy import deepcopy
-from itertools import permutations, chain
-
-
+from itertools import permutations, chain, count
+from pprint import pprint
+import random
 import operators
+
 from operators import *
-import reasning_operators
-from reasning_operators import *
-
-
-class NumericQuestion:
-    def __init__(self, operator_config, assignment_config, min_value, max_value, output_type):
-        self.ope = operator_config["ope"]
-        assert self.ope in operators.__all__, f"operator \"{ope}\" is not defined"
-
-        self.ope_args = operator_config["args"]
-
-        self.default_operator_assumption = {o: globals()[o] for o in operators.__all__}
-        self.reasning_operators_dict = {o: globals()[o] for o in reasning_operators.__all__}
-        self.prog_env = {}
-        self.prog_env.update(**self.default_operator_assumption, **self.reasning_operators_dict)
-
-        self.assumptions = assignment_config
-        self.prog_states = []
-        self.final_state = None
-        self.ans = None
-        self.max_value = max_value
-        self.min_value = min_value
-        self.output_type = output_type
-        self.calculated = False
+from numerical_question import NumericQuestion
 
 
 
-        
-
-    def exec_prog(self):
-        ope_args_str = ", ".join(map(lambda s: f"{s}={s}", self.ope_args))
-        
-
-        for assumption in self.assumptions:
-            # 引数となっている変数の値を保持
-            args_state = {s : self.prog_env.get(s) for s in assumption["format"] if not (self.prog_env.get(s) is None)}
-            self.prog_states.append(args_state)
-
-            
-            prog = "{} = round({}.assign({}), 2)".format(assumption["variable"], assumption["type"], ", ".join(assumption["format"]))
-
-            exec(prog, {}, self.prog_env)
-            
-
-        exec(f"ans = {self.ope}.func({ope_args_str})\nans = round(ans, 2) if type(ans) is float else ans", {}, self.prog_env)
-            
-
-
-    def assign_value(self):
-
-        #プログラムの実行
-        self.exec_prog()
-
-
-        self.ans = self.prog_env["ans"]
-        self.final_state = deepcopy(self.prog_env)
-        for s in chain(self.default_operator_assumption.keys(), self.reasning_operators_dict.keys()):
-            self.final_state.pop(s)
-
-        self.calculated = True
-
-
-
-    def make_passage(self):
-        passage_list = []
-        for assumption, state in zip(self.assumptions, self.prog_states):
-            one_substitution_passage = "{}={}".format(assumption["variable"], self.reasning_operators_dict[assumption["type"]].get_representaion(assumption["format"], state))
-            passage_list.append(one_substitution_passage)
-
-        return ",".join(passage_list)
-        
-        
-    # 生成されたpassage, question, answerの3つ組を返す
-    def make_pqa_triple(self):
-        assert self.calculated, "Call assign_value meethod before this method."
-
-        if self.output_type == "ask_last_question":
-            
-            passage = self.make_passage()
-            assert not (self.ans is None), "Don't use No answer operation in \"ask_last_question\""
-            answer = [str(self.ans)]
-            question = [self.default_operator_assumption[self.ope].get_representaion(*self.ope_args) + "="]
-
-            
-            
-
-        elif self.output_type == "ask_all_variables":
-    
-            passage = self.make_passage()
-            self.final_state.pop("ans")
-            question = [f"{k}=" for k in self.final_state.keys()]
-            answer = list(map(str, self.final_state.values()))
-            
-            if not (self.ans is None):
-                last_question = self.default_operator_assumption[self.ope].get_representaion(*self.ope_args) + "="
-                question.append(last_question)
-                answer.append(str(self.ans))
-            
-        else:
-            raise NotImplementedError(f"output_type \"{self.output_type}\" is not defined!")
-
-        return passage, question, answer
 
 
 class NumericDataGenarator:
-    def __init__(self, config_filepath="./config.json"):
+    def __init__(self, config_filepath):
         with open(config_filepath, mode="r") as f:
             self.config_dict = json.load(f)
 
-        random.seed(self.config_dict["seed"])
+        if not (self.config_dict["seed"] == "None"):
+            assert type(self.config_dict["seed"]) is int, "Random seed is not int!"
+            self.random_module = random.Random(self.config_dict["seed"])
+        else:
+            self.random_module = random
 
+        
+            
+        
+        assert os.environ.get('PYTHONHASHSEED') == "0", "Set enviroment variable \"PYTHONHASHSEED\" = \"0\""
+        
         self.number_of_symbols = self.config_dict["number_of_symbols"]
-        assert 2 <= self.number_of_symbols <= 52, "number_of_symbols is out of range"
+        assert 2 <= self.number_of_symbols <= 26, "number_of_symbols is out of range"
 
-        self.symbols = (string.ascii_uppercase + string.ascii_lowercase)[:self.number_of_symbols]
+        #self.symbols = (string.ascii_lowercase + string.ascii_uppercase)[:self.number_of_symbols]
+        self.symbols = string.ascii_lowercase[:self.number_of_symbols]
         
         self.max_number_of_question = self.config_dict["max_number_of_question"]
+        
+        
         self.max_value = self.config_dict["max_value"]
         self.min_value = self.config_dict["min_value"]
         self.generation_rules = self.config_dict["generation_rules"]
         
-        self.reasning_operators_dict = {o : globals()[o] for o in reasning_operators.__all__}
+        
+        self.operators_dict = {o: globals()[o] for o in operators.__all__} 
         
         self.output_type = self.config_dict["output_type"]
         self.dtype = self.config_dict["dtype"]
 
         if self.dtype=="int":
-            self.random_func = random.randint
+            self.random_func = self.random_module.randint
         elif self.dtype=="float":
-            self.random_func = lambda a, b : round(random.uniform(a, b), 2)
+            self.random_func = lambda a, b : round(self.random_module.uniform(a, b), 2)
         else:
             raise NotImplementedError(f"Dtype \"{self.dtype}\" in config file is not defined")
+
+
+        
+    def format_assert(self, format_for_assertion, operator_acceptable_formats):
+        """
+        代入に用いる, 変数, 数値の形式が正しいか確認
+        """
+        
+        if ("*num_var" in operator_acceptable_formats) or ("*var_num" in operator_acceptable_formats):
+            return True
+        
+        all_num = all(map(lambda x: x == "num", format_for_assertion))
+        all_var = all(map(lambda x: x == "var", format_for_assertion))
         
         
-    def instantiate_format(self, possible_formats, assignment_format_type, temp_assignment_configs, commutative, use_index=False):
+        for acceptable_format in operator_acceptable_formats:
+            if type(acceptable_format) is tuple:
+                
+                if acceptable_format == format_for_assertion:
+                    return True
+                
+            elif type(acceptable_format) is str:
+                if acceptable_format.startswith("*num_var") or acceptable_format.startswith("*var_num"):
+                    n = int(acceptable_format.split(":")[-1])
+                    if len(format_for_assertion) >= n:
+                        return True
+                
+                elif acceptable_format.startswith("*num") and all_num:
+                    n = int(acceptable_format.split(":")[-1])
+                    if len(format_for_assertion) >= n:
+                        return True
+
+                elif acceptable_format.startswith("*var") and all_var:
+                    n = int(acceptable_format.split(":")[-1])
+                    if len(format_for_assertion) >= n:
+                        return True
+
+                else:
+                    tuple_acceptable_format = (acceptable_format, )
+                    if tuple_acceptable_format == format_for_assertion:
+                        return True        
+                    
+            else:
+                raise Exception(f"type : {type(acceptable_format)} can not be handled")
+        
+
+        return False
+
+        
+        
+    def instantiate_format(self, possible_formats, assignment_format_type, temp_assignment_configs, commutative, generation_type, assumption_length=None):
+
+        # (generation_type == "template") =>(ならば) (assumption_length is not  None)
+        assert (not generation_type == "template") or (assumption_length is not  None), "Input \"assumption_length\" when you use \"generation\""
+        
+        if len(possible_formats) == 0:
+            return []
         
         #リストの要素をタプル化
         possible_formats = list(map(lambda x: tuple(x) if type(x) is list else x, possible_formats))
         
-
         if commutative:
             #possible_formats += list(permutations(possible_formats))
             temp_possible_formats = []
@@ -159,40 +128,59 @@ class NumericDataGenarator:
 
             # 同一のものを取り除く
             possible_formats = list(set(possible_formats + temp_possible_formats))
-            
         
-        
+        possible_formats = sorted(possible_formats, key=hash)
         
         temp_assignment_config_variables = [tac["variable"] for tac in temp_assignment_configs]
-        selected_format = random.choices(possible_formats)[0]
-        
+        selected_format = self.random_module.choice(possible_formats)
         instantiated_format = []
         
         if type(selected_format) is tuple:
-            format_for_assertion = tuple(map(lambda x : "var" if type(x) is int else x, selected_format))
+
             # 代入に用いる, 変数, 数値の形式が正しいか確認
-            assert format_for_assertion in self.reasning_operators_dict[assignment_format_type].arg_formats, f"\"{assignment_format_type}\" is not support \"{format_for_assertion}\"."
+            format_for_assertion = tuple(map(lambda x : "var" if type(x) is int else x, selected_format))
+            
+            operator_acceptable_formats = self.operators_dict[assignment_format_type].arg_formats
+            
+            
+            assert self.format_assert(format_for_assertion, operator_acceptable_formats), f"\"{assignment_format_type}\" is not support \"{format_for_assertion}\"."
+
             
             for elem in selected_format:
                 if elem == "num":
                     instantiated_format.append(str(self.random_func(self.min_value, self.max_value)))
                 elif elem == "var":
-                    instantiated_format.append(random.choices(temp_assignment_config_variables)[0])
-                elif (type(elem) is int) and use_index:
+                    instantiated_format.append(self.random_module.choices(temp_assignment_config_variables)[0])
+                elif type(elem) is int:
+                    assert generation_type=="template", "generation_rules:type = \"random\" can not use index selection."
+                    # - でリストを参照する際に, temp_assignment_config_variables(リスト)の所望の位置にアクセスできるようにする. (temp_assignment_config_variablesは長さがその時点まで処理したものしか格納されていないため)
+                    if elem < 0:
+                        elem = assumption_length + elem
+                    
                     instantiated_format.append(temp_assignment_config_variables[elem])
                 else:
                     raise NotImplementedError()
         
         
         else:
-            format_for_assertion = "var" if type(selected_format) is int else selected_format
-            assert format_for_assertion in self.reasning_operators_dict[assignment_format_type].arg_formats, f"\"{assignment_format_type}\" is not support \"{format_for_assertion}\"."
 
+            # 代入に用いる, 変数, 数値の形式が正しいか確認
+            format_for_assertion = "var" if type(selected_format) is int else selected_format
+
+            
+            operator_acceptable_formats = self.operators_dict[assignment_format_type].arg_formats
+            
+            assert self.format_assert((format_for_assertion, ), operator_acceptable_formats), f"\"{assignment_format_type}\" is not support \"{format_for_assertion}\"."
+            
             if selected_format == "num":
                 instantiated_format.append(str(self.random_func(self.min_value, self.max_value)))
             elif selected_format == "var":
-                instantiated_format.append(random.choices(temp_assignment_config_variables)[0])
-            elif (type(selected_format) is int) and use_index:
+                instantiated_format.append(self.random_module.choices(temp_assignment_config_variables)[0])
+            elif type(selected_format) is int:
+                assert generation_type=="template", "generation_rules:type = \"random\" can not use index selection."
+                if selected_format < 0:
+                    elem = assumption_length + selected_format
+                
                 instantiated_format.append(temp_assignment_config_variables[selected_format])
             else:
                 raise NotImplementedError()
@@ -204,56 +192,15 @@ class NumericDataGenarator:
 
 
 
-    def instantiate_operator_args(self, operator_args_pos, assignment_configs, commutative):
-        operator_args_pos = list(map(lambda x: tuple(x) if type(x) is list else x, operator_args_pos))
-
-        if len(operator_args_pos) == 0:
-            return []
-
-        if commutative:
-            temp_operator_args_pos = []
-            for oap in operator_args_pos:
-                if not(type(oap) is tuple):
-                    continue
-                temp_operator_args_pos += list(map(tuple, permutations(oap)))
-
-            # 同一のものを取り除く
-            operator_args_pos = list(set(operator_args_pos + temp_operator_args_pos))
-
-
-        selected_format = random.choices(operator_args_pos)[0]
-        instantiated_operator_args = []
-        random_iter = iter(random.sample(range(len(assignment_configs)), len(assignment_configs)))
-
-        if type(selected_format) is tuple:
-
-            for elem in selected_format:
-                if elem == "random":
-                    instantiated_operator_args.append(assignment_configs[next(random_iter)]["variable"])
-                elif type(elem) is int:
-                    instantiated_operator_args.append(assignment_configs[elem]["variable"])
-                else:
-                    raise NotImplementedError()
-        else:
-            
-            if selected_format == "random":
-                instantiated_operator_args.append(assignment_configs[next(random_iter)]["variable"])
-            elif type(selected_format) is int:
-                instantiated_operator_args.append(assignment_configs[selected_format]["variable"])
-            else:
-                raise NotImplementedError()
-        
-
-        return instantiated_operator_args
+    
     
 
-    def generator_of_template(self, generation_rule):
+    def generator_of_template_configs(self, generation_rule):
         assert generation_rule["type"] == "template", "generation_rule's type is not match."
-        #assert len(generation_rule["assignment_format"]) >= 2, "\"assignment_format\" must be longer than 2"
         
         while True:
             assignment_configs = []
-            shuffled_symbol_list = random.sample(self.symbols, len(self.symbols))
+            shuffled_symbol_list = self.random_module.sample(self.symbols, len(self.symbols))
         
             for assignment_format in generation_rule["assignment_format"]:
                 temp_symbol = shuffled_symbol_list.pop()
@@ -261,7 +208,7 @@ class NumericDataGenarator:
                 commutative = bool(assignment_format.get("commutative"))
 
                 if type(assignment_format["type"]) is list:
-                    selected_assignment_type = random.choice(assignment_format["type"])
+                    selected_assignment_type = self.random_module.choice(assignment_format["type"])
                 else:
                     selected_assignment_type = assignment_format["type"]
                     
@@ -269,38 +216,43 @@ class NumericDataGenarator:
                     {
                         "variable" : temp_symbol,
                         "type" : selected_assignment_type,
-                        "format" : self.instantiate_format(assignment_format["format"], selected_assignment_type, assignment_configs, commutative, use_index=True)
+                        "format" : self.instantiate_format(
+                            assignment_format["format"],
+                            selected_assignment_type,
+                            assignment_configs,
+                            commutative,
+                            "template",
+                            assumption_length=len(generation_rule["assignment_format"])
+                        )
                     }
                 )
 
                 
-            operator_args = self.instantiate_operator_args(generation_rule["operator"]["arg_pos"], assignment_configs, bool(generation_rule["operator"].get("commutative")))
 
+            commutative = bool(generation_rule["operator"].get("commutative"))
 
-            
-            if type(generation_rule["operator"]["type"]) is str:
-                
-                operator_config = {
-                    "ope"  : generation_rule["operator"]["type"],
-                    "args" : operator_args
-                }
-                
+            if type(generation_rule["operator"]["type"]) is list:
+                selected_ope = self.random_module.choices(generation_rule["operator"]["type"], weights=generation_rule["operator"]["selection_probabilities"])[0]
             else:
-                operator_config = {
-                    "ope"  : random.choices(generation_rule["operator"]["type"], weights=generation_rule["operator"]["selection_probabilities"])[0],
-                    "args" : operator_args
-                }
-                
+                selected_ope = generation_rule["operator"]["type"]
 
-            neumeric_question = NumericQuestion(operator_config, assignment_configs, self.min_value, self.max_value, self.output_type)
-            neumeric_question.assign_value()
-            passage, question, answer = neumeric_question.make_pqa_triple()
             
-            yield passage, question, answer
-        
-       
+            operator_config = {
+                "ope"  : selected_ope,
+                "format" : self.instantiate_format(
+                    generation_rule["operator"]["format"],
+                    selected_ope,
+                    assignment_configs,
+                    commutative,
+                    "template",
+                    assumption_length=len(generation_rule["assignment_format"])
+                )
+            }
 
+            yield operator_config, assignment_configs
+            
 
+            
 
     def get_possible_assignment_format(self, assignment_format_list, generation_step_capacity, number_of_available_variable):
         """
@@ -325,7 +277,7 @@ class NumericDataGenarator:
         
 
 
-    def generator_of_random(self, generation_rule):
+    def generator_of_random_configs(self, generation_rule):
         assert generation_rule["type"] == "random", "generation_rule's type is not match."
         assert all(map(lambda x: len(x["format"]) == 1, generation_rule["assignment_format"])), "assignment_format of random generation must have \"format\" that length is 1."
 
@@ -341,12 +293,12 @@ class NumericDataGenarator:
 
         # yieldのループ
         while True:
-            shuffled_symbol_list = random.sample(self.symbols, len(self.symbols))
+            shuffled_symbol_list = self.random_module.sample(self.symbols, len(self.symbols))
 
 
             possible_format_list = generation_rule["assignment_format"]
             possible_format_selection_probability = [pf["probability"] for pf in possible_format_list]
-            generation_step_capacity = random.randint(min_generation_step, max_generation_step)
+            generation_step_capacity = self.random_module.randint(min_generation_step, max_generation_step)
 
             # 最初は必ず変数の数値代入でなければならない
             assignment_configs = [
@@ -376,7 +328,7 @@ class NumericDataGenarator:
                 
                 
                 possible_assignment_weights = [paf["probability"] for paf in possible_assignment_format]
-                assignment_format = random.choices(possible_assignment_format, weights=possible_assignment_weights)[0]
+                assignment_format = self.random_module.choices(possible_assignment_format, weights=possible_assignment_weights)[0]
 
                 temp_symbol = shuffled_symbol_list.pop()
                 # None の時もfalseになる
@@ -384,7 +336,7 @@ class NumericDataGenarator:
 
 
                 if type(assignment_format["type"]) is list:
-                    selected_assignment_type = random.choice(assignment_format["type"])
+                    selected_assignment_type = self.random_module.choice(assignment_format["type"])
                 else:
                     selected_assignment_type = assignment_format["type"]
                 
@@ -393,7 +345,7 @@ class NumericDataGenarator:
                     {
                         "variable" : temp_symbol,
                         "type" : selected_assignment_type,
-                        "format" : self.instantiate_format(assignment_format["format"], selected_assignment_type, assignment_configs, commutative, use_index=False)
+                        "format" : self.instantiate_format(assignment_format["format"], selected_assignment_type, assignment_configs, commutative, generation_type="random")
                     }
                 )
 
@@ -401,47 +353,44 @@ class NumericDataGenarator:
                 generation_step_capacity -= assignment_format["step_weight"]
                 
                 
-
-            
-            operator_args = self.instantiate_operator_args(generation_rule["operator"]["arg_pos"], assignment_configs, bool(generation_rule["operator"].get("commutative")))
-
-            
-            if type(generation_rule["operator"]["type"]) is str:
                 
-                operator_config = {
-                    "ope"  : generation_rule["operator"]["type"],
-                    "args" : operator_args
-                }
-                
+            commutative = bool(generation_rule["operator"].get("commutative"))
+
+            if type(generation_rule["operator"]["type"]) is list:
+                selected_ope = self.random_module.choices(generation_rule["operator"]["type"], weights=generation_rule["operator"]["selection_probabilities"])[0]
             else:
-                operator_config = {
-                    "ope"  : random.choices(generation_rule["operator"]["type"], weights=generation_rule["operator"]["selection_probabilities"])[0],
-                    "args" : operator_args
-                }
-
+                selected_ope = generation_rule["operator"]["type"]
 
             
-            neumeric_question = NumericQuestion(operator_config, assignment_configs, self.min_value, self.max_value, self.output_type)
-            neumeric_question.assign_value()
-            passage, question, answer = neumeric_question.make_pqa_triple()
+            operator_config = {
+                "ope"  : selected_ope,
+                "format" : self.instantiate_format(generation_rule["operator"]["format"], selected_ope, assignment_configs, commutative, generation_type="random")
+            }
             
-            yield passage, question, answer    
+            yield operator_config, assignment_configs
 
             
 
+    def get_pqa_triple_from_configs(self, operator_config, assignment_configs, separate=False):
+        neumeric_question = NumericQuestion(operator_config, assignment_configs, self.min_value, self.max_value, self.output_type)
 
+        result = neumeric_question()
+        if separate:
+            result = [(result[0], q, a) for q, a in zip(result[1],result[2])]
+        
+        return result
 
     
             
-    def generate_data(self):
+    def __call__(self, generate_config=False):
         generator_list = []
 
         #各ルールに基づいたジェネレータの作成
         for generation_rule in self.generation_rules:
             if generation_rule["type"] == "random":
-                generator_list.append(self.generator_of_random(generation_rule))
+                generator_list.append(self.generator_of_random_configs(generation_rule))
             elif generation_rule["type"] == "template":
-                generator_list.append(self.generator_of_template(generation_rule))
+                generator_list.append(self.generator_of_template_configs(generation_rule))
             else:
                 error_rule_name = generation_rule["type"]
                 raise Exception(f"rule \"{error_rule_name}\" is not defined")
@@ -449,12 +398,21 @@ class NumericDataGenarator:
 
         selection_weigths = [generation_rule["selection_probability"] for generation_rule in self.generation_rules]
 
-            
-        for i in range(self.max_number_of_question):
-            temp_generator = random.choices(generator_list, weights=selection_weigths)[0]
-            yield next(temp_generator)
 
-
+        if self.max_number_of_question == "inf":
+            counter = count()
+        else:
+            counter = range(self.max_number_of_question)
+        
+        
+        if not generate_config: 
+            for i in counter:
+                temp_generator = self.random_module.choices(generator_list, weights=selection_weigths)[0]
+                yield self.get_pqa_triple_from_configs(*next(temp_generator))
+        else:
+            for i in counter:
+                yield next(self.random_module.choices(generator_list, weights=selection_weigths)[0])
+        
                 
 
 
@@ -463,7 +421,16 @@ if __name__ == "__main__":
     parser.add_argument("config_filepath",  help="Select config file", type = str)
     args = parser.parse_args()
     
+    
     N = NumericDataGenarator(config_filepath=args.config_filepath)
-    g = N.generate_data()
-    for triple in g:
-        print(triple)
+    g = N(generate_config=True)
+    for data in g:
+        #passage, question, answer = data
+        #print(passage)
+        #print(question)
+        #print(answer)
+        operator_config, assignment_configs = data
+        pprint(operator_config)
+        pprint(assignment_configs)
+        print(N.get_pqa_triple_from_configs(*data))
+        

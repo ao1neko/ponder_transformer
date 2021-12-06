@@ -5,6 +5,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
@@ -22,7 +23,7 @@ def calculate_acc(pred_y:torch.Tensor,true_y:torch.Tensor,pad_id=0)-> int:
     pred_y = torch.argmax(pred_y, dim=-1)
 
     for pred_y_token,true_y_token in zip(pred_y,true_y):
-        if pred_y_token.item() == (true_y_token.item()-1): count += 1
+        if pred_y_token.item() == true_y_token.item(): count += 1
     return count
 
 
@@ -55,7 +56,6 @@ def vanilla_train(
             x = x.to(device)
             true_y = true_y.to(device)
             src_key_padding_mask = (x == pad_id)
-
             optimizer.zero_grad()
             pred_y = model(x, 
                            src_key_padding_mask=src_key_padding_mask)
@@ -164,18 +164,19 @@ def vanilla_print_sample(
     """
 
     if load_pass is not None:
+        print(load_pass)
         model.load_state_dict(torch.load(load_pass)) 
 
     for x_item,true_y_item in zip(x,true_y):
         x_item = torch.unsqueeze(x_item.to(device), 0)
         true_y_item = torch.unsqueeze(true_y_item.to(device), 0)
         print(f"x:{[id2word_dic[id] for id in x_item[0].tolist()]}")
-        print(f"true_y:{[id2word_dic[id] for id in true_y_item[0].tolist()]}")
+        print(f"true_y:{id2word_dic[true_y_item[0].item()]}")
         src_key_padding_mask = (x_item == pad_id)
 
         pred_y = model(x_item,
                             src_key_padding_mask=src_key_padding_mask)
         print(
-            f"pred_y:{['<CLS>']+[id2word_dic[id] for id in torch.argmax(pred_y[0],dim=-1)[:-1].tolist()]}")
+            f"pred_y:{id2word_dic[torch.argmax(pred_y[0],dim=-1).item()]}")
 
 

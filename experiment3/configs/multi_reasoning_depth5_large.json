@@ -1,7 +1,7 @@
 {
     "seed" : 616,
     "number_of_symbols" : 26,
-    "max_number_of_question" : 100000,
+    "max_number_of_question" : 1000000,
     "min_value" : 0,
     "max_value" : 99,
     "dtype" : "int",
@@ -30,6 +30,18 @@
 		    "type" : ["Add", "Sub"],
 		    "format" : [[1, "num"]],
 		    "commutative" : true
+		},
+		
+		{
+		    "type" : ["Add", "Sub"],
+		    "format" : [[2, "num"]],
+		    "commutative" : true
+		},
+		
+		{
+		    "type" : ["Add", "Sub"],
+		    "format" : [[3, "num"]],
+		    "commutative" : true
 		}
 		
 	    ],
@@ -38,7 +50,7 @@
 	    "operator" : {
 		"type" : ["Check"],
 		"selection_probabilities" : [1.0], 
-		"format" : [2]
+		"format" : [4]
 	    }
 	}
     ]

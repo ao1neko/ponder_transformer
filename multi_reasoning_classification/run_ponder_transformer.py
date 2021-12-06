@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from ponder_transformer import RegularizationLoss,ClassifyingReconstructionLoss
+from ponder_transformer import GeneratingReconstructionLoss, RegularizationLoss
 
 import torch.nn.functional as F
 from einops import rearrange
@@ -20,13 +20,14 @@ def calculate_acc(pred_y:torch.Tensor,true_y:torch.Tensor,h:torch.Tensor,pad_id=
     Returns:
         int: num of accuracy
     """
+  
     count = 0
     pred_y = rearrange(pred_y, 'n b d-> b n d')
 
     for pred_y_n,true_y_token,h_item in zip(pred_y,true_y,h):
         pred_y_token = pred_y_n[h_item.item()-1]
         pred_y_token = torch.argmax(pred_y_token, dim=-1)
-        if pred_y_token.item() == (true_y_token.item()-1): count += 1
+        if pred_y_token.item() == true_y_token.item(): count += 1
     return count
 
 def ponder_train(
@@ -46,9 +47,8 @@ def ponder_train(
     sep_id: int = None,
     modelsave_pass = "best_ponder_models/",
 ):
-
     best_accuracy = 0.0
-    loss_rec_inst = ClassifyingReconstructionLoss()
+    loss_rec_inst = GeneratingReconstructionLoss()
     loss_reg_inst = RegularizationLoss(
         lambda_p=1.0/max_step, max_steps=max_step, device=device)
     
@@ -60,7 +60,7 @@ def ponder_train(
         for x, true_y in train_loader:
             x = x.to(device)
             true_y = true_y.to(device)
-            src_key_padding_mask = (x == pad_id)
+            src_key_padding_mask = (x== pad_id)
 
             optimizer.zero_grad()
             pred_y, p, h = model(x,
@@ -90,7 +90,9 @@ def ponder_train(
                 for x, true_y in valid_loader:
                     x = x.to(device)
                     true_y = true_y.to(device)
-                    src_key_padding_mask = (x == pad_id)
+                    src_key_padding_mask = (x== pad_id)
+
+
 
                     pred_y, p, h = model(
                         x,src_key_padding_mask=src_key_padding_mask)
@@ -126,7 +128,8 @@ def ponder_test(
     beta:float = 0.1,
     pad_id: int = 0,
     sep_id: int = None,
-    load_pass = None
+    load_pass = None,
+    concated = False
 ):
 
     if load_pass is not None:
@@ -136,33 +139,62 @@ def ponder_test(
     with torch.no_grad():
         test_total_loss = 0.0
         test_total_acc = 0.0
-        counter_h = torch.zeros(max_step+1).to(device)
-        loss_rec_inst = ClassifyingReconstructionLoss()
+        loss_rec_inst = GeneratingReconstructionLoss()
         loss_reg_inst = RegularizationLoss(
             lambda_p=1.0/max_step, max_steps=max_step, device=device)
         
-        
-        for x, true_y in test_loader:
-            x = x.to(device)
-            true_y = true_y.to(device)
-            src_key_padding_mask = (x == pad_id)
+        if not concated :
+            counter_h = torch.zeros(max_step+1).to(device)
+            for x, true_y in test_loader:
+                x = x.to(device)
+                true_y = true_y.to(device)
+                src_key_padding_mask = (x== pad_id)
 
-            pred_y, p, h = model(x,
-                                 src_key_padding_mask=src_key_padding_mask)
 
-            loss_rec = loss_rec_inst(p, pred_y, true_y, pad_id=pad_id)
-            loss_reg = loss_reg_inst(p,)
-            loss_overall = loss_rec + beta * loss_reg
+                pred_y, p, h = model(x,
+                                    src_key_padding_mask=src_key_padding_mask)
 
-            test_total_loss += loss_overall.item()
-            test_total_acc += calculate_acc(pred_y, true_y, h,pad_id=pad_id)
-            bincount_h = torch.bincount(h)
-            padded_bincount_h = F.pad(bincount_h, pad=(0,counter_h.shape[0] - bincount_h.shape[0]), mode='constant', value=0)
-            counter_h = counter_h + padded_bincount_h
+                loss_rec = loss_rec_inst(p, pred_y, true_y, pad_id=pad_id)
+                loss_reg = loss_reg_inst(p,)
+                loss_overall = loss_rec + beta * loss_reg
+
+                test_total_loss += loss_overall.item()
+                test_total_acc += calculate_acc(pred_y, true_y, h,pad_id=pad_id)
+                bincount_h = torch.bincount(h)
+                padded_bincount_h = F.pad(bincount_h, pad=(0,counter_h.shape[0] - bincount_h.shape[0]), mode='constant', value=0)
+                counter_h = counter_h + padded_bincount_h
             
-        print(f"test_loss:{test_total_loss/len(test_loader)}")
-        print(f"test_acc:{test_total_acc/len(test_data)}")
-        print(f"counter_h:{counter_h[1:]}")
+            print(f"test_loss:{test_total_loss/len(test_loader)}")
+            print(f"test_acc:{test_total_acc/len(test_data)}")
+            print(f"counter_h:{counter_h[1:]}")
+        else:
+            counter_h = torch.zeros(2,max_step+1).to(device)
+            for x, true_y in test_loader:
+                x = x.to(device)
+                true_y = true_y.to(device)
+                src_key_padding_mask = (x== pad_id)
+
+
+                pred_y, p, h = model(x,
+                                    src_key_padding_mask=src_key_padding_mask)
+
+                loss_rec = loss_rec_inst(p, pred_y, true_y, pad_id=pad_id)
+                loss_reg = loss_reg_inst(p,)
+                loss_overall = loss_rec + beta * loss_reg
+
+                test_total_loss += loss_overall.item()
+                test_total_acc += calculate_acc(pred_y, true_y, h,pad_id=pad_id)
+                
+                x_length = torch.count_nonzero((x!=0),dim=-1)
+                bincount_h_depth2 = torch.bincount((x_length == 14)*h)
+                bincount_h_depth3 = torch.bincount((x_length == 20)*h)
+                padded_bincount_h_depth2 = F.pad(bincount_h_depth2, pad=(0,counter_h.shape[1] - bincount_h_depth2.shape[0]), mode='constant', value=0)
+                padded_bincount_h_depth3 = F.pad(bincount_h_depth3, pad=(0,counter_h.shape[1] - bincount_h_depth3.shape[0]), mode='constant', value=0)
+                counter_h[0] = counter_h[0] + padded_bincount_h_depth2
+                counter_h[1] = counter_h[1] + padded_bincount_h_depth3
+            print(f"test_loss:{test_total_loss/len(test_loader)}")
+            print(f"test_acc:{test_total_acc/len(test_data)}")
+            print(f"counter_h:{counter_h[:,1:]}")
 
 
 def ponder_print_sample(
@@ -198,19 +230,15 @@ def ponder_print_sample(
         x_item = torch.unsqueeze(x_item.to(device), 0)
         true_y_item = torch.unsqueeze(true_y_item.to(device), 0)
         print(f"x:{[id2word_dic[id] for id in x_item[0].tolist()]}")
-        print(f"true_y:{[id2word_dic[true_y_item[0].item()]]}")
+        print(f"true_y:{id2word_dic[true_y_item[0].item()]}")
 
-        src_key_padding_mask = (x_item == pad_id)
+        src_key_padding_mask = (x== pad_id)
 
-        pred_y, p, h = model(x_item, 
+
+        pred_y, p, h = model(x_item,
                             src_key_padding_mask=src_key_padding_mask)
-        id = torch.sigmoid(pred_y[0]).item()
-        if id > 0.5 :
-            id = 2
-        else: 
-            id = 1
         print(
-            f"pred_y:{id2word_dic[id]}")
+            f"pred_y:{id2word_dic[torch.argmax(pred_y[h[0]-1][0],dim=-1).item()]}")
         print(f"halting step:{h[0]}")
         print(f"halting probability:{p[:,0]}\n")
 

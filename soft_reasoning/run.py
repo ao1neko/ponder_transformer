@@ -49,7 +49,7 @@ def main(args):
     valid_data = SoftReasonersData(args.data_pass+"/dev.jsonl")
     save_pass = "/home/aoki0903/sftp_sync/MyPonderNet/nlp_datasets/rule-reasoning-dataset-V2020.2.5.0/"
     make_word_dic([train_data.data_x, valid_data.data_x], save_pass,
-                  init_word_dic={"<PAD>": 0, "true": 1, "false": 2})
+                  init_word_dic={"<PAD>": 0, "true":2, "false":1})
     with open(save_pass + "word_dic.json", "r") as tf:
         word_dic = json.load(tf)
         # print(word_dic.items())
@@ -87,6 +87,7 @@ def main(args):
     pad_id = train_data.word_dic["<PAD>"]
 
     load_pass = args.load_pass
+
 
     if ponder_model:
         if strtobool(args.train):
@@ -129,7 +130,9 @@ def main(args):
                 model=model,
                 device=device,
                 pad_id=pad_id,
-                sep_id=sep_id
+                sep_id=sep_id,
+                load_pass=load_pass,
+
             )
     else:
         if strtobool(args.train):
@@ -169,7 +172,9 @@ def main(args):
                 model=model,
                 device=device,
                 pad_id=pad_id,
-                sep_id=sep_id
+                sep_id=sep_id,
+                load_pass=load_pass,
+                
             )
 
 

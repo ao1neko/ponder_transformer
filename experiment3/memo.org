@@ -1,0 +1,18 @@
+* アップデート予定の内容
+** TODO 現状
+- 2つ目のTODOの「NoQuestionの実現」までのコードは書けたつもりになりましたが, デバックは一切していません
+- 続きは, 適当なconfig(config/config.json等)で試して, デバックをする. 
+
+
+** TODO operator.py, reasning_operator.pyの統合
+ - 数値, 変数を自由に指定できる
+
+** TODO NoQuestionの実現
+
+** TODO 生成するデータの個数の均等化
+
+** TODO 利用する数字の集合をtrain set, dev setで分ける
+
+** TODO BasiOperatorクラスのinitにcommutive機能を実装する
+
+

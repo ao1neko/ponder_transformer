@@ -1,15 +1,12 @@
-import argparse
 import torch
-import torch.nn as nn
 from torch.utils.data import Dataset
 import numpy as np
 import json
 import string
-import tqdm
-import pickle
 import more_itertools
 from util import make_word_dic,make_id_dic,convert_str
 from typing import List,Dict
+import random
 
 class Reverse(Dataset):
     def __init__(self,data_size=100,data_dim=40,low = 0,high=10):
@@ -78,7 +75,7 @@ class ParityDataset(Dataset):
         return x, y
     
     
-class MultiReasoningData(Dataset):
+class MultiReasoningGenBERTData(Dataset):
     def __init__(self,json_pass):
         self.word_dic = self._make_dic()
         self.id_dic = self._make_id_dic(self.word_dic)
@@ -108,8 +105,8 @@ class MultiReasoningData(Dataset):
         list_x = []
         list_y = []
         for data in json_dic.values():
-            text = [word_dic[c] for c in data["passage"]]
-            q = [word_dic[c] for c in data["qa_pairs"][0]["question"]]
+            text = [word_dic[c] for c in self._convert_str(data["passage"])]
+            q = [word_dic[c] for c in self._convert_str(data["qa_pairs"][0]["question"])]
             
             list_x.append([word_dic["<CLS>"]]+text+[word_dic["<SEP>"]]+q+[word_dic["<SEP>"]])
             list_y.append([word_dic["<CLS>"]]+[word_dic[c] for c in data["qa_pairs"][0]["answer"]["number"]]+[word_dic["<SEP>"]])
@@ -137,6 +134,134 @@ class MultiReasoningData(Dataset):
     
     def id_to_text(self,l):
         return [self.id_dic[id.item()] for id in l]
+
+    def _convert_str(self,str:str):
+        str = str.replace(" ","")
+        return str
+    
+    
+class MultiReasoningData(Dataset):
+    def __init__(self,json_pass):
+        self.word_dic = self._make_dic()
+        self.id_dic = self._make_id_dic(self.word_dic)
+        self.data_x, self.data_y = self._read_json(json_pass,self.word_dic)
+        self.data_x = torch.tensor(self.data_x)
+        self.data_y = torch.tensor(self.data_y)
+        self.vocab_size = len(self.word_dic)
+        
+        
+    def __len__(self):
+        return len(self.data_x)
+
+    def __getitem__(self, index):
+        return self.data_x[index], self.data_y[index]
+    
+    def _read_json(self,json_pass,word_dic):
+        with open(json_pass,'r') as jf:
+            json_dic = json.load(jf)
+        list_x = []
+        list_y = []
+        for data in json_dic.values():
+            text = [word_dic[c] for c in self._convert_str(data["passage"])]
+            q = [word_dic[c] for c in self._convert_str(data["qa_pairs"][0]["question"])]
+            
+            list_x.append([word_dic["<CLS>"]]+text+[word_dic["<SEP>"]]+q+[word_dic["<SEP>"]])
+            list_y.append(word_dic[data["qa_pairs"][0]["answer"]["number"]])
+
+        return list_x,list_y
+    
+    def _make_dic(self,upper_chr=True,lower_chr=True,min_value=-1000,max_value=1000,operater=["=",",","+","-","*"],tag=["<CLS>","<SEP>"]):
+        dic = {"<PAD>":0}
+        for c in tag: dic[c] = len(dic)
+        if upper_chr == True:
+            for c in string.ascii_uppercase: dic[c] = len(dic)
+        if lower_chr == True:
+            for c in string.ascii_lowercase: dic[c] = len(dic)
+        for c in range(min_value,max_value+1): dic[str(c)] = len(dic)
+        for c in operater: dic[c] = len(dic)
+        
+        
+        return dic
+        
+    def _make_id_dic(self,word_dic):
+        dic = {}
+        for key,value in word_dic.items():
+            dic[value]=key
+        return dic
+    
+    def id_to_text(self,l):
+        return [self.id_dic[id.item()] for id in l]
+
+    def _convert_str(self,str:str):
+        str = str.replace(","," ,")
+        return str.split(" ")
+    
+    
+class ConcatedMultiReasoningData(Dataset):
+    def __init__(self,json_pass_list):
+        self.word_dic = self._make_dic()
+        self.id_dic = self._make_id_dic(self.word_dic)
+        self.data_x, self.data_y = self._read_json(json_pass_list,self.word_dic)
+        self.x_max_len = max([len(text) for text in self.data_x])
+        
+        #padding
+        for text in self.data_x:
+            text.extend([0] * (self.x_max_len - len(text)))
+            
+        self.data_x = torch.tensor(self.data_x)
+        self.data_y = torch.tensor(self.data_y)
+        self.vocab_size = len(self.word_dic)
+        
+        
+    def __len__(self):
+        return len(self.data_x)
+
+    def __getitem__(self, index):
+        return self.data_x[index], self.data_y[index]
+    
+    def _read_json(self,json_pass_list,word_dic):
+        list_x = []
+        list_y = []
+        for json_pass in json_pass_list:
+            with open(json_pass,'r') as jf:
+                json_dic = json.load(jf)
+            for data in json_dic.values():
+                text = [word_dic[c] for c in self._convert_str(data["passage"])]
+                q = [word_dic[c] for c in self._convert_str(data["qa_pairs"][0]["question"])]
+                
+                list_x.append([word_dic["<CLS>"]]+text+[word_dic["<SEP>"]]+q+[word_dic["<SEP>"]])
+                list_y.append(word_dic[data["qa_pairs"][0]["answer"]["number"]])
+        
+        tmp_list = list(zip(list_x,list_y)).copy()
+        random.shuffle(tmp_list)
+        list_x , list_y= zip(*tmp_list)
+        return list_x,list_y
+    
+    def _make_dic(self,upper_chr=True,lower_chr=True,min_value=-1000,max_value=1000,operater=["=",",","+","-","*"],tag=["<CLS>","<SEP>"]):
+        dic = {"<PAD>":0}
+        for c in tag: dic[c] = len(dic)
+        if upper_chr == True:
+            for c in string.ascii_uppercase: dic[c] = len(dic)
+        if lower_chr == True:
+            for c in string.ascii_lowercase: dic[c] = len(dic)
+        for c in range(min_value,max_value+1): dic[str(c)] = len(dic)
+        for c in operater: dic[c] = len(dic)
+        
+        
+        return dic
+        
+    def _make_id_dic(self,word_dic):
+        dic = {}
+        for key,value in word_dic.items():
+            dic[value]=key
+        return dic
+    
+    def id_to_text(self,l):
+        return [self.id_dic[id.item()] for id in l]
+
+    def _convert_str(self,str:str):
+        str = str.replace(","," ,")
+        return str.split(" ")
     
 class SoftReasonersData(Dataset):
     def __init__(self,json_pass):
@@ -172,6 +297,9 @@ class SoftReasonersData(Dataset):
                     
                     data_x.append("<CLS> "+ context + " <SEP> " + question + " <SEP>")
                     data_y.append(answer)
+        data_x = data_x[:5]
+        data_y = data_y[:5]
+        
         return data_x,data_y
     
     def def_dic(self,word_dic:Dict[str,int],id_dic:Dict[int,str]):
@@ -186,16 +314,13 @@ class SoftReasonersData(Dataset):
         id_data_x = []
         id_data_y = []
         
-        for text_x,text_y in zip(self.data_x,self.data_y):
+        for text_x,token_y in zip(self.data_x,self.data_y):
             id_list_x = []
-            id_list_y = []
             
             for word in text_x.split(" "):
                 id_list_x.append(self.word_dic[word])
-            for word in text_y.split(" "):
-                id_list_y.append(self.word_dic[word])
             id_data_x.append(id_list_x)
-            id_data_y.append(id_list_y)           
+            id_data_y.append(self.word_dic[token_y])           
             
         self.id_data_x_len = max([len(text) for text in id_data_x])
         
@@ -205,7 +330,6 @@ class SoftReasonersData(Dataset):
         
         self.id_data_x = torch.tensor(id_data_x)
         self.id_data_y = torch.tensor(id_data_y)
-            
         
    
 class BABIData(Dataset):
@@ -230,9 +354,8 @@ class BABIData(Dataset):
         
         with open(txt_pass,'r') as txt_file:
             txt_list = list(txt_file.read().split("\n"))
-            txt_list = txt_list[:-1] #最後の\nを削除
-            
-            for splited_txt_list in more_itertools.split_before(txt_list,lambda t: t[0]=="1"):
+            txt_list = [txt for txt in txt_list if txt !=''] #最後の\nを削除
+            for splited_txt_list in more_itertools.split_before(txt_list,lambda t: t[:2]=="1 "):
                 context = []
                 for txt in splited_txt_list:
                     if len(txt.split("\t")) == 1:
@@ -263,16 +386,13 @@ class BABIData(Dataset):
         id_data_x = []
         id_data_y = []
         
-        for text_x,text_y in zip(self.data_x,self.data_y):
+        for text_x,token_y in zip(self.data_x,self.data_y):
             id_list_x = []
-            id_list_y = []
             
             for word in text_x.split(" "):
                 id_list_x.append(self.word_dic[word])
-            for word in text_y.split(" "):
-                id_list_y.append(self.word_dic[word])
             id_data_x.append(id_list_x)
-            id_data_y.append(id_list_y)           
+            id_data_y.append(self.word_dic[token_y])           
             
         self.id_data_x_len = max([len(text) for text in id_data_x])
         
