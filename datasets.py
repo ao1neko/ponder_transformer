@@ -220,9 +220,13 @@ class ConcatedMultiReasoningData(Dataset):
         return self.data_x[index], self.data_y[index]
     
     def _read_json(self,json_pass_list,word_dic):
-        list_x = []
-        list_y = []
+        train_list_x = []
+        train_list_y = []
+        test_list_x = []
+        test_list_y = []
         for json_pass in json_pass_list:
+            list_x = []
+            list_y = []
             with open(json_pass,'r') as jf:
                 json_dic = json.load(jf)
             for data in json_dic.values():
@@ -231,10 +235,19 @@ class ConcatedMultiReasoningData(Dataset):
                 
                 list_x.append([word_dic["<CLS>"]]+text+[word_dic["<SEP>"]]+q+[word_dic["<SEP>"]])
                 list_y.append(word_dic[data["qa_pairs"][0]["answer"]["number"]])
-        
-        tmp_list = list(zip(list_x,list_y)).copy()
-        random.shuffle(tmp_list)
-        list_x , list_y= zip(*tmp_list)
+            
+            list_x_len = len(list_x)  # n_samples is 60000
+            train_len = int(list_x_len * 0.8)
+            train_list_x.extend(list_x[:train_len])
+            train_list_y.extend(list_y[:train_len])
+            test_list_x.extend(list_x[train_len:])
+            test_list_y.extend(list_y[train_len:])
+        train_list = list(zip(train_list_x,train_list_y))
+        test_list = list(zip(test_list_x,test_list_y))
+        random.shuffle(train_list)
+        random.shuffle(test_list)
+        train_list.extend(test_list)
+        list_x , list_y= zip(*train_list)
         return list_x,list_y
     
     def _make_dic(self,upper_chr=True,lower_chr=True,min_value=-1000,max_value=1000,operater=["=",",","+","-","*"],tag=["<CLS>","<SEP>"]):

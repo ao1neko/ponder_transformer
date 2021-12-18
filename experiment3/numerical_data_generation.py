@@ -7,8 +7,8 @@ from copy import deepcopy
 from itertools import permutations, chain, count
 from pprint import pprint
 import random
-import operators
 
+import operators
 from operators import *
 from numerical_question import NumericQuestion
 
@@ -27,8 +27,6 @@ class NumericDataGenarator:
         else:
             self.random_module = random
 
-        
-            
         
         assert os.environ.get('PYTHONHASHSEED') == "0", "Set enviroment variable \"PYTHONHASHSEED\" = \"0\""
         
@@ -57,8 +55,9 @@ class NumericDataGenarator:
             self.random_func = lambda a, b : round(self.random_module.uniform(a, b), 2)
         else:
             raise NotImplementedError(f"Dtype \"{self.dtype}\" in config file is not defined")
-
-
+        
+        self.shuffle_order = self.config_dict.get("shuffle_order", False)
+                
         
     def format_assert(self, format_for_assertion, operator_acceptable_formats):
         """
@@ -249,6 +248,7 @@ class NumericDataGenarator:
                 )
             }
 
+            self.set_order(assignment_configs)
             yield operator_config, assignment_configs
             
 
@@ -366,19 +366,58 @@ class NumericDataGenarator:
                 "ope"  : selected_ope,
                 "format" : self.instantiate_format(generation_rule["operator"]["format"], selected_ope, assignment_configs, commutative, generation_type="random")
             }
-            
+
+            self.set_order(assignment_configs)
             yield operator_config, assignment_configs
 
+
+    def rand_enumerate(self, iterable):
+        random_indexes = self.random_module.sample(range(len(iterable)), len(iterable))
+        yield from zip(random_indexes, iterable)
+            
+
+    def set_order(self, assignment_configs):
+        for i, conf in enumerate(assignment_configs):
+            conf["reasning_index"] = i
+
+        if self.shuffle_order:
+            for i, conf in self.rand_enumerate(assignment_configs):
+                conf["repr_index"] = i
+        else:
+            for i, conf in enumerate(assignment_configs):
+                conf["repr_index"] = i
             
 
     def get_pqa_triple_from_configs(self, operator_config, assignment_configs, separate=False):
-        neumeric_question = NumericQuestion(operator_config, assignment_configs, self.min_value, self.max_value, self.output_type)
-
+        #assignment_configs = sorted(assignment_configs, key=lambda d: d["reasning_index"])
+        
+        neumeric_question = NumericQuestion(
+            operator_config,
+            assignment_configs,
+            self.min_value,
+            self.max_value,
+            self.output_type
+        )
         result = neumeric_question()
+
+        
+        separated_passage = result[0].split(", ")
+        assert len(separated_passage) == len(assignment_configs), "Passage length dose not match..."
+
+        list_shuffled_passage, _ = zip(
+            *sorted(
+                zip(separated_passage, assignment_configs),
+                key=lambda x: x[1]["repr_index"]
+            )
+        )
+
+        result = (", ".join(list_shuffled_passage), result[1], result[2])
+        
         if separate:
-            result = [(result[0], q, a) for q, a in zip(result[1],result[2])]
+            result = [(result[0], q, a) for q, a in zip(result[1], result[2])]
         
         return result
+
 
     
             
@@ -394,8 +433,7 @@ class NumericDataGenarator:
             else:
                 error_rule_name = generation_rule["type"]
                 raise Exception(f"rule \"{error_rule_name}\" is not defined")
-
-
+        
         selection_weigths = [generation_rule["selection_probability"] for generation_rule in self.generation_rules]
 
 

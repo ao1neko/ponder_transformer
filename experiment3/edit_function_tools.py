@@ -2,10 +2,8 @@ import argparse
 from pathlib import Path
 from itertools import permutations
 
-import random
 
-
-def fill_template(selected_oerpator_dict, candidate_symbols, available_variables, numerical_data_generator, use_index=False):
+def fill_template(selected_oerpator_dict, candidate_symbols, available_variables, numerical_data_generator, random_module, use_index=False):
     
     selected_format = selected_oerpator_dict["format"]
     
@@ -22,7 +20,7 @@ def fill_template(selected_oerpator_dict, candidate_symbols, available_variables
             if elem == "num":
                 filled_format.append(str(numerical_data_generator.random_func(numerical_data_generator.min_value, numerical_data_generator.max_value)))
             elif elem == "var":
-                filled_format.append(random.choice(available_variables))
+                filled_format.append(random_module.choice(available_variables))
             elif (type(elem) is int) and use_index:
                 assert generation_type=="template", "generation_rules:type = \"random\" can not use index selection."
                 # - でリストを参照する際に, available_variables(リスト)の所望の位置にアクセスできるようにする. (available_variablesは長さがその時点まで処理したものしか格納されていないため)
@@ -47,7 +45,7 @@ def fill_template(selected_oerpator_dict, candidate_symbols, available_variables
         if selected_format == "num":
             filled_format.append(str(numerical_data_generator.random_func(numerical_data_generator.min_value, numerical_data_generator.max_value)))
         elif selected_format == "var":
-            filled_format.append(random.choice(available_variables))
+            filled_format.append(random_module.choice(available_variables))
         elif (type(selected_format) is int) and use_index:
             assert generation_type=="template", "generation_rules:type = \"random\" can not use index selection."
             if elem < 0:
@@ -59,7 +57,7 @@ def fill_template(selected_oerpator_dict, candidate_symbols, available_variables
 
 
     return {
-        "variable": random.choice(candidate_symbols),
+        "variable": random_module.choice(candidate_symbols),
         "type": selected_oerpator_dict["type"],
         "format": filled_format
     }

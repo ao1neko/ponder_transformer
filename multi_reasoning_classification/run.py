@@ -12,7 +12,10 @@ sys.path.append(os.pardir)
 
 from ponder_transformer import PonderTransformerGenerater
 from vanilla_transformer import TransformerGenerater
+from loop_transformer import LoopTransformerGenerater
 from datasets import MultiReasoningData,ConcatedMultiReasoningData
+
+
 import torch.nn.functional as F
 
 from torch.utils.tensorboard import SummaryWriter
@@ -43,20 +46,18 @@ def main(args):
     batch_size = args.batch_size
     beta = args.beta
     ponder_model = strtobool(args.ponder_model)
+    loop_model = strtobool(args.loop_model)
     concated = strtobool(args.concated)
     if concated:
-        pass_list = ["multi_reasoning_depth2.json","multi_reasoning_depth3.json"]
+        pass_list = ["multi_reasoning_depth2_mul3_sizeconst_small.json","multi_reasoning_depth3_mul3_sizeconst_small.json","multi_reasoning_depth4_mul3_sizeconst_small.json","multi_reasoning_depth5_mul3_sizeconst_small.json","multi_reasoning_depth6_mul3_sizeconst_small.json"]
         all_data = ConcatedMultiReasoningData([args.json_pass + x for x in pass_list])
-        all_data = MultiReasoningData("multi_reasoning_depth2.json")
-        all_data = MultiReasoningData("multi_reasoning_depth3.json")
     else:
         all_data = MultiReasoningData(args.json_pass)  # if文で切り替える?,testはこれを分割して使用
     
     all_data_len = len(all_data)  # n_samples is 60000
     train_len = int(all_data_len * 0.8)
     train_indices = list(range(0, train_len))  # [0,1,.....47999]
-    valid_indices = list(range(train_len, all_data_len)
-                         )  # [48000,48001,.....59999]
+    valid_indices = list(range(train_len, all_data_len))  # [48000,48001,.....59999]
     train_data = Subset(all_data, train_indices)
     valid_data = Subset(all_data, valid_indices)
     
@@ -68,11 +69,15 @@ def main(args):
                                                shuffle=True)
     vocab_size = all_data.vocab_size
     max_step = args.max_step
+    lambda_p=args.lambda_p
     emb_dim = args.emb_dim
 
     if ponder_model:
         model = PonderTransformerGenerater(vocab_size=vocab_size, allow_halting=False,emb_dim=emb_dim,
                                   max_steps=max_step, num_token=vocab_size).to(device)
+    elif loop_model:
+        model = LoopTransformerGenerater(vocab_size=vocab_size,emb_dim=emb_dim,
+                            num_token=vocab_size, num_layers=max_step).to(device)
     else:
         model = TransformerGenerater(vocab_size=vocab_size,emb_dim=emb_dim,
                             num_token=vocab_size, num_layers=max_step).to(device)
@@ -93,6 +98,7 @@ def main(args):
                 train_loader=train_loader,
                 max_step=max_step,
                 beta=beta,
+                lambda_p=lambda_p,
                 valid=strtobool(args.valid),
                 valid_data=valid_data,
                 valid_loader=valid_loader,
@@ -116,7 +122,6 @@ def main(args):
                 sep_id=sep_id,
                 concated = concated
             )
-
         if args.print_sample_num > 0:
             print_sample_num = args.print_sample_num
             ponder_print_sample(
@@ -182,6 +187,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', default=66, type=int)
     parser.add_argument('--emb_dim', default=128, type=int)
     parser.add_argument('--beta', default=1.0, type=float)
+    parser.add_argument('--lambda_p', default=20, type=int)
     parser.add_argument('--device', default="cuda:0")
     parser.add_argument(
         '--json_pass', default="/work01/aoki0903/PonderNet/multihop_experiment/datas/ponder_base.json")
@@ -195,6 +201,7 @@ if __name__ == '__main__':
     parser.add_argument('--print_sample_num', default=0, type=int)
     parser.add_argument('--ponder_model', default='true')
     parser.add_argument('--concated', default='false')
+    parser.add_argument('--loop_model', default='false')
     parser.add_argument('--lr',default=0.00003,type=float)
     args = parser.parse_args()
     main(args)

@@ -42,6 +42,7 @@ def ponder_train(
     valid_loader: DataLoader = None,
     max_step: int = 20,
     beta:float=0.1,
+    lambda_p: int=20,
     epochs: int = 30,
     pad_id: int = 0,
     sep_id: int = None,
@@ -50,7 +51,7 @@ def ponder_train(
     best_accuracy = 0.0
     loss_rec_inst = GeneratingReconstructionLoss()
     loss_reg_inst = RegularizationLoss(
-        lambda_p=1.0/max_step, max_steps=max_step, device=device)
+        lambda_p=1.0/lambda_p, max_steps=max_step, device=device)
     
     for epoch in tqdm(range(epochs)):
         total_loss = 0.0
@@ -60,7 +61,7 @@ def ponder_train(
         for x, true_y in train_loader:
             x = x.to(device)
             true_y = true_y.to(device)
-            src_key_padding_mask = (x== pad_id)
+            src_key_padding_mask = (x== pad_id).to(device)
 
             optimizer.zero_grad()
             pred_y, p, h = model(x,
@@ -148,7 +149,7 @@ def ponder_test(
             for x, true_y in test_loader:
                 x = x.to(device)
                 true_y = true_y.to(device)
-                src_key_padding_mask = (x== pad_id)
+                src_key_padding_mask = (x== pad_id).to(device)
 
 
                 pred_y, p, h = model(x,
@@ -168,11 +169,11 @@ def ponder_test(
             print(f"test_acc:{test_total_acc/len(test_data)}")
             print(f"counter_h:{counter_h[1:]}")
         else:
-            counter_h = torch.zeros(2,max_step+1).to(device)
+            counter_h = torch.zeros(3,max_step+1).to(device)
             for x, true_y in test_loader:
                 x = x.to(device)
                 true_y = true_y.to(device)
-                src_key_padding_mask = (x== pad_id)
+                src_key_padding_mask = (x== pad_id).to(device)
 
 
                 pred_y, p, h = model(x,
@@ -188,10 +189,13 @@ def ponder_test(
                 x_length = torch.count_nonzero((x!=0),dim=-1)
                 bincount_h_depth2 = torch.bincount((x_length == 14)*h)
                 bincount_h_depth3 = torch.bincount((x_length == 20)*h)
+                bincount_h_depth4 = torch.bincount((x_length == 26)*h)
                 padded_bincount_h_depth2 = F.pad(bincount_h_depth2, pad=(0,counter_h.shape[1] - bincount_h_depth2.shape[0]), mode='constant', value=0)
                 padded_bincount_h_depth3 = F.pad(bincount_h_depth3, pad=(0,counter_h.shape[1] - bincount_h_depth3.shape[0]), mode='constant', value=0)
+                padded_bincount_h_depth4 = F.pad(bincount_h_depth4, pad=(0,counter_h.shape[1] - bincount_h_depth4.shape[0]), mode='constant', value=0)
                 counter_h[0] = counter_h[0] + padded_bincount_h_depth2
                 counter_h[1] = counter_h[1] + padded_bincount_h_depth3
+                counter_h[2] = counter_h[2] + padded_bincount_h_depth4
             print(f"test_loss:{test_total_loss/len(test_loader)}")
             print(f"test_acc:{test_total_acc/len(test_data)}")
             print(f"counter_h:{counter_h[:,1:]}")

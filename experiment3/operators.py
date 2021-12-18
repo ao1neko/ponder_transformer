@@ -4,7 +4,7 @@ from basic_operator import BasicOperator
 """
  定義したクラスを必ず追加してください. (operaterとして用いない場合は不要です. )
  """
-__all__ = ["Substitution", "Check", "Add", "Sub","Mul", "WhoMax", "PseudoAdd", "NoQuestion", "Max"]
+__all__ = ["Substitution", "Check", "Add", "Sub","Mul","ModAdd", "ModSub","ModMul", "WhoMax", "PseudoAdd", "NoQuestion", "Max"]
 
 class Substitution(BasicOperator):
     arg_formats = ["num", "var"]
@@ -86,6 +86,66 @@ class Mul(BasicOperator):
     def __call__(self, arg_list, state):
         #assert len(arg_list) == 2
         return self.func_nest(lambda a, b: a * b, self.get_values(arg_list, state))
+    
+
+    def get_representation(self, arg_list, state):
+        return " * ".join(map(str, arg_list))
+
+    def func_nest(self, f, iterable):
+        input_iter = iter(iterable)
+        temp_value = next(input_iter)
+        for v in input_iter:
+            temp_value = f(temp_value, v)
+        return temp_value
+
+class Max(BasicOperator):
+    arg_formats = ["*num_var:1"]
+    
+    def __call__(self, arg_list, state):
+        return max(self.get_values(arg_list, state))
+    
+
+    def get_representation(self, arg_list, state):
+        return "max({})".format(",".join(map(str, arg_list)))
+
+class ModAdd(BasicOperator):
+    arg_formats = ["*num_var:2"]
+    
+    def __call__(self, arg_list, state):
+        #assert len(arg_list) == 2
+        return sum(self.get_values(arg_list, state)) % 10
+    
+
+    def get_representation(self, arg_list, state):
+        return " + ".join(map(str, arg_list))
+
+
+
+class ModSub(BasicOperator):
+    arg_formats = ["*num_var:2"]
+    
+    def __call__(self, arg_list, state):
+        #assert len(arg_list) == 2
+        return self.func_nest(lambda a, b: (a - b) % 10, self.get_values(arg_list, state))
+    
+
+    def get_representation(self, arg_list, state):
+        return " - ".join(map(str, arg_list)) 
+
+
+    def func_nest(self, f, iterable):
+        input_iter = iter(iterable)
+        temp_value = next(input_iter)
+        for v in input_iter:
+            temp_value = f(temp_value, v)
+        return temp_value
+
+class ModMul(BasicOperator):
+    arg_formats = ["*num_var:2"]
+    
+    def __call__(self, arg_list, state):
+        #assert len(arg_list) == 2
+        return self.func_nest(lambda a, b: (a * b) % 10 , self.get_values(arg_list, state)) 
     
 
     def get_representation(self, arg_list, state):

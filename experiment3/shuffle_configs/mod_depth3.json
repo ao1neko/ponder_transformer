@@ -1,0 +1,88 @@
+{
+    "seed" : 616,
+    "number_of_symbols" : 10,
+    "max_number_of_question" : "inf",
+    "min_value" : 0,
+    "max_value" : 9,
+    "dtype" : "int",
+    "output_type" : "ask_last_question",
+	"shuffle_order": true, 
+
+    "generation_rules" : [
+	{
+	    "type" : "template",
+	    "selection_probability" : 0.333333,
+	    "assignment_format" : [   
+		{
+		    "type" : "Substitution",
+		    "format" : ["num"]
+		},
+		{
+		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "format" : [[0, "num"]],
+		    "commutative" : true
+		},
+		{
+		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "format" : [[1, "num"]],
+		    "commutative" : true
+		}
+	    ],    
+	    "operator" : {
+		"type" : ["Check"],
+		"selection_probabilities" : [1.0], 
+		"format" : [2]
+	    }
+	},
+	{
+	    "type" : "template",
+	    "selection_probability" : 0.3333333,
+	    "assignment_format" : [   
+		{
+		    "type" : "Substitution",
+		    "format" : ["num"]
+		},
+		{
+		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "format" : [[0, "num"]],
+		    "commutative" : true
+		},
+		{
+		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "format" : [[1, "num"]],
+		    "commutative" : true
+		}
+	    ],    
+	    "operator" : {
+		"type" : ["Check"],
+		"selection_probabilities" : [1.0], 
+		"format" : [1]
+	    }
+	},
+	{
+	    "type" : "template",
+	    "selection_probability" : 0.333333,
+	    "assignment_format" : [   
+		{
+		    "type" : "Substitution",
+		    "format" : ["num"]
+		},
+		{
+		    "type" : ["Add","Sub","Mul"],
+		    "format" : [[0, "num"]],
+		    "commutative" : true
+		},
+		{
+		    "type" : ["Add","Sub","Mul"],
+		    "format" : [[1, "num"]],
+		    "commutative" : true
+		}
+	    ],    
+	    "operator" : {
+		"type" : ["Check"],
+		"selection_probabilities" : [1.0], 
+		"format" : [0]
+	    }
+	}
+    ]
+}

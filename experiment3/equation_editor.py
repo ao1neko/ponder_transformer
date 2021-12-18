@@ -5,9 +5,10 @@ import random
 from pathlib import Path
 from pprint import pprint
 
-from . import edit_functions
-from .edit_functions import *
-from .numerical_data_generation import NumericDataGenarator
+import edit_functions
+from edit_functions import *
+from numerical_data_generation import NumericDataGenarator
+
 
 class EquationEditor:
     def __init__(self, config_file_path, numerical_data_generator):
@@ -35,18 +36,27 @@ class EquationEditor:
             self.probabilities.append(float(d["probability"]))
             self.functions.append(self.edit_functions_dict[d["function"]])
 
-    
-    def __call__(self, operator_config, assignment_configs):
-        
-        while True:
-            index = self.random_module.choices(self.indexes, weights=self.probabilities)[0]
-            yield self.functions[index](
+
+    def select_function(self):
+        index = self.random_module.choices(self.indexes, weights=self.probabilities)[0]
+
+        def edit_func_template(operator_config, assignment_configs):
+            return self.functions[index](
                 operator_config,
                 assignment_configs,
                 self.config_dict["edit_rules"][index],
                 self.numerical_data_generator,
                 self.random_module
             )
+        
+        return edit_func_template
+
+    
+    def __call__(self, operator_config, assignment_configs):
+        raise RuntimeError("Don't use this method to avoid bug!")
+        while True:
+            edit_func = self.select_function()
+            yield edit_func(operator_config, assignment_configs)
             
         
 

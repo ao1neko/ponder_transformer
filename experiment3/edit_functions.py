@@ -4,7 +4,7 @@ from copy import deepcopy
 
 from .edit_function_tools import fill_template, apply_commutative, is_num
 
-__all__ = ["add_step", "add_dummy", "change_value", "change_variable", "change_variable_order", "remove_last_step"]
+__all__ = ["add_step", "add_dummy", "change_value", "change_variable", "change_variable_order", "remove_last_step", "change_digit", "chanage_operator", "change_formula_order"]
 
 
 def add_step(operator_config, assignment_configs, rule_dict, numerical_data_generator, random_module):
@@ -53,10 +53,24 @@ def add_step(operator_config, assignment_configs, rule_dict, numerical_data_gene
 
     
     selected_oerpator_dict = random_module.choice(candidates)
-    new_operator_config = fill_template(selected_oerpator_dict, candidate_symbols, available_variables, numerical_data_generator, use_index=False)
+    new_operator_config = fill_template(selected_oerpator_dict, candidate_symbols, available_variables, numerical_data_generator, random_module, use_index=False)
+    
+    new_operator_config["reasning_index"] = assignment_configs[-1]["reasning_index"] + 1
 
+
+    if numerical_data_generator.shuffle_order:
+        repr_insert_index = random_module.randint(0, new_operator_config["reasning_index"])
+        new_operator_config["repr_index"] = repr_insert_index
+        for conf in assignment_configs:
+            if conf["repr_index"] >= repr_insert_index:
+                conf["repr_index"] += 1
+    else:
+        new_operator_config["repr_index"] = new_operator_config["reasning_index"]
+                
+    
     assignment_configs.append(new_operator_config)
-
+    
+    
     # operator_configで利用する変数を書き換える
     operator_config["format"] = [new_operator_config["variable"] if c == available_variables[0] else c for c in operator_config["format"]]
 
@@ -108,8 +122,31 @@ def add_dummy(operator_config, assignment_configs, rule_dict, numerical_data_gen
                 
     
     selected_oerpator_dict = random_module.choice(candidates)
-    new_operator_config = fill_template(selected_oerpator_dict, candidate_symbols, available_variables, numerical_data_generator, use_index=False)
+    new_operator_config = fill_template(selected_oerpator_dict, candidate_symbols, available_variables, numerical_data_generator, random_module, use_index=False)
 
+
+    new_operator_config["reasning_index"] = insert_index
+    
+
+    if numerical_data_generator.shuffle_order:
+        repr_insert_index = random_module.randint(0, assignment_configs[-1]["reasning_index"] + 1)
+        new_operator_config["repr_index"] = repr_insert_index
+        for conf in assignment_configs:
+            if conf["repr_index"] >= repr_insert_index:
+                conf["repr_index"] += 1
+            if conf["reasning_index"] >= new_operator_config["reasning_index"]:
+                conf["reasning_index"] += 1
+
+                
+    else:
+        new_operator_config["repr_index"] = new_operator_config["reasning_index"]
+        for conf in assignment_configs:
+            if conf["repr_index"] >= new_operator_config["repr_index"]:
+                conf["repr_index"] += 1
+            if conf["reasning_index"] >= new_operator_config["reasning_index"]:
+                conf["reasning_index"] += 1
+
+    
     assignment_configs.insert(insert_index, new_operator_config)
     return operator_config, assignment_configs
 
@@ -157,7 +194,7 @@ def change_value(operator_config, assignment_configs, rule_dict, numerical_data_
             
         elif (type(config_format) is str) and is_num(config_format, numerical_data_generator.dtype):
             num_count += 1
-            if num_count == selection_probability:
+            if num_count == selected_num_index:
                 assignment_configs[j]["format"] = str(
                     numerical_data_generator.random_func(
                         numerical_data_generator.min_value,
@@ -185,7 +222,7 @@ def change_value(operator_config, assignment_configs, rule_dict, numerical_data_
 
         elif (type(config_format) is str) and is_num(config_format, numerical_data_generator.dtype):
             num_count += 1
-            if num_count == selection_probability:
+            if num_count == selected_num_index:
                 assignment_configs[j]["format"] = str(
                     numerical_data_generator.random_func(
                         numerical_data_generator.min_value,
@@ -282,6 +319,7 @@ def remove_last_step(operator_config, assignment_configs, rule_dict, numerical_d
     assert deleted_config is not None, f"Maybe, \"{deleted_varialble}\" is not defined"
 
     
+    
     used_variable_in_deleted_config = list(set(filter(lambda x: not is_num(x, numerical_data_generator.dtype), deleted_config["format"])))
     assert len(used_variable_in_deleted_config) == 1, "Number of variable in deleted_config[\"format\"] must be 1!"
     used_variable_in_deleted_config = used_variable_in_deleted_config[0]
@@ -293,14 +331,157 @@ def remove_last_step(operator_config, assignment_configs, rule_dict, numerical_d
     assignment_configs.reverse()
     assignment_configs.remove(deleted_config)
     assignment_configs.reverse()
+
+
+    for conf in assignment_configs:
+        if conf["repr_index"] > deleted_config["repr_index"]:
+            conf["repr_index"] -= 1
+
+    return operator_config, assignment_configs
+
+
+
+def change_digit(operator_config, assignment_configs, rule_dict, numerical_data_generator, random_module):
+    operator_config = deepcopy(operator_config)
+    assignment_configs = deepcopy(assignment_configs)
+    
+    num_count = 0
+    
+    for config in assignment_configs + [operator_config]:
+        config_format = config["format"]
+        if type(config_format) is list:
+            num_count += ilen(filter(lambda x: is_num(x, numerical_data_generator.dtype), config_format))
+        elif (type(config_format) is str) and is_num(config_format, numerical_data_generator.dtype):
+            num_count += 1
+        else:
+            raise NotImplementedError()
+
+    assert num_count > 0, "There are no number in this equation"
+
+    selected_num_index = random_module.choice(tuple(range(1, num_count + 1)))
+
+    def convert_digits(num):
+        str_num = str(num)
+        change_index = random_module.choice(range(len(str_num)))
+        
+        while True:
+            new_digit = str(numerical_data_generator.random_func(0, 9))
+            if not str_num[change_index] == new_digit:
+                list_num = list(str_num)
+                list_num[change_index] = new_digit
+                str_num =  "".join(list_num)
+                if str_num[0] == "0" and len(str_num) > 1:
+                    continue
+                break
+        return str_num
+        
+        
+    
+    num_count = 0
+    for j, config in enumerate(assignment_configs):
+        config_format = config["format"]
+        if type(config_format) is list:
+            for i, s in enumerate(config_format):
+                if is_num(s, numerical_data_generator.dtype):
+                    num_count += 1
+                    if num_count == selected_num_index:
+                        config_format[i] = convert_digits(s)
+                        break
+            else:
+                continue
+            break
+            
+        elif (type(config_format) is str) and is_num(config_format, numerical_data_generator.dtype):
+            num_count += 1
+            if num_count == selected_num_index:
+                assignment_configs[j]["format"] = convert_digits(s)
+                break
+        else:
+            raise NotImplementedError()
+                
+    else:
+        config_format = operator_config["format"]
+        if type(config_format) is list:
+            for i, s in enumerate(config_format):
+                if is_num(s, numerical_data_generator.dtype):
+                    num_count += 1
+                    if num_count == selected_num_index:
+                        config_format[i] = convert_digits(s)
+                        break
+
+        elif (type(config_format) is str) and is_num(config_format, numerical_data_generator.dtype):
+            num_count += 1
+            if num_count == selected_num_index:
+                assignment_configs[j]["format"] = convert_digits(s)
+        else:
+            raise NotImplementedError()
+        
+    assert num_count == selected_num_index, "Mismatch was occured..."
+    
+    return operator_config, assignment_configs
+    
+
+
+
+def chanage_operator(operator_config, assignment_configs, rule_dict, numerical_data_generator, random_module):
+    operator_config = deepcopy(operator_config)
+    assignment_configs = deepcopy(assignment_configs)
+    
+    assert type(rule_dict.get("operator_convert_rules")) is list, "You have to define \"operator_convert_rules\" attribute!"
+
+
+    operator_config["type"] = operator_config["ope"] 
+
+    combined_configs = assignment_configs + [operator_config]
+    befores = [d["before"]  for d in rule_dict["operator_convert_rules"]]
+    convert_candidates_index = []
+
+    
+    for i, config in enumerate(combined_configs):
+        if config["type"] in befores:
+            convert_candidates_index.append(i)
+
+    assert len(convert_candidates_index) > 0, "No candidate to convert..."
+        
+    selected_config_index = random_module.choice(convert_candidates_index)
+
+    old_type = combined_configs[selected_config_index]["type"]
+    convert_rule_candidates = list(
+        filter(
+            lambda d: d["before"] == old_type,
+            rule_dict["operator_convert_rules"]
+        )
+    )
+    assert len(convert_rule_candidates) == 1, "No appropriate rule is exist..."
+
+    selected_rule = random_module.choice(convert_rule_candidates)
+    combined_configs[selected_config_index]["type"] = selected_rule["after"]
+
+    operator_config["ope"] = operator_config["type"]
+    del operator_config["type"]
+    
+    return operator_config, assignment_configs
+
+
+
+
+
+def change_formula_order(operator_config, assignment_configs, rule_dict, numerical_data_generator, random_module):
+    
+    operator_config = deepcopy(operator_config)
+    assignment_configs = deepcopy(assignment_configs)
+
+    new_order_index = random_module.sample(
+        range(len(assignment_configs)),
+        len(assignment_configs)
+    )
+    for conf, index in zip(assignment_configs, new_order_index):
+        conf["repr_index"] = index
+
     return operator_config, assignment_configs
 
 
 
 def Pseudolize(operator_config, assignment_configs, rule_dict, numerical_data_generator, random_module):
     raise NotImplementedError()
-
-
-
-
 

@@ -59,34 +59,40 @@ def passage_questuion_generater(config_filepath):
 
 
 
-def drop_dataset_generater(save_filename, config_filepath):
-
+def drop_dataset_generater(save_filename, config_filepath,max_number_of_question):
+    passage_set = set()
+    
     with open(save_filename, mode="w") as f:
         f.write("{\n")
         counter = count()
         is_first = True
+        id = 0
+        
         for passage_questuion in passage_questuion_generater(config_filepath):
-            if not is_first:
-                f.write(",\n")
+            passage_questuion_string = passage_questuion['passage']+passage_questuion["qa_pairs"][0]['question']
+            if passage_questuion_string  not in passage_set and abs(int(passage_questuion["qa_pairs"][0]['answer']['number']))<1000:
+                passage_set.add(passage_questuion_string)
+                if not is_first:
+                    f.write(",\n")
+                id = next(counter)
+                data_name = f"nfl_{id}"
+                new_data = json.dumps({data_name: passage_questuion}, indent=4)
+                new_data = new_data[1:-2]
                 
-            
-            data_name = f"nfl_{next(counter)}"
-            new_data = json.dumps({data_name: passage_questuion}, indent=4)
-            new_data = new_data[1:-2]
-            
-            f.write(new_data)
-            is_first = False
-            
+                f.write(new_data)
+                is_first = False
+            if id == max_number_of_question: break
         f.write("\n}\n")
 
             
 
 def main(args):
-    drop_dataset_generater(args.output_filepath, args.config_filepath)
+    drop_dataset_generater(args.output_filepath, args.config_filepath,args.max_number_of_question)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("config_filepath",  help="Select config file", type = str)
     parser.add_argument("output_filepath",  help="Select output file", type = str)
+    parser.add_argument("max_number_of_question",  help="Smax_number_of_question", type = int,default=10000)
     args = parser.parse_args()
     main(args)
