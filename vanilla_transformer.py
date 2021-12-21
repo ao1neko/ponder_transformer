@@ -7,7 +7,7 @@ from util import make_tgt_mask, PositionalEncoder
 
 class Transformer(nn.Module):
     def __init__(
-        self,vocab_size ,emb_dim=512,num_layers=1,nhead=8,num_token=100
+        self,vocab_size ,emb_dim=512,num_layers=1,nhead=8,num_token=100,liner_dim=128
     ):
         """Transformer
 
@@ -20,13 +20,13 @@ class Transformer(nn.Module):
         """
         super().__init__()
         self.num_token = num_token
+        self.liner_dim = liner_dim
+        
         self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
         self.pos_encoder = PositionalEncoder(d_model=emb_dim)
-        self.transformer = nn.Transformer(d_model=emb_dim,nhead=nhead,num_encoder_layers=num_layers,num_decoder_layers=num_layers,batch_first=True)
+        self.transformer = nn.Transformer(d_model=emb_dim,nhead=nhead,num_encoder_layers=num_layers,num_decoder_layers=1,batch_first=True)
         self.output_layer = nn.Sequential(
-            nn.Linear(emb_dim, 128),
-            nn.ReLU(),
-            nn.Linear(128, self.num_token),
+            nn.Linear(emb_dim, self.num_token),
         )
 
         
@@ -73,7 +73,7 @@ class TransformerrClassifier(nn.Module):
     
 class TransformerGenerater(nn.Module):
     def __init__(
-        self,vocab_size ,emb_dim=128,num_layers=1,nhead=8,num_token=100
+        self,vocab_size ,emb_dim=128,num_layers=1,nhead=8,num_token=100,liner_dim=128
     ):
         """Transformer
 
@@ -87,15 +87,16 @@ class TransformerGenerater(nn.Module):
         super().__init__()
         self.num_token = num_token
         self.emb_dim = emb_dim
+        self.liner_dim = liner_dim
         
         self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
         self.pos_encoder = PositionalEncoder(d_model=emb_dim)
         self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=num_layers)
         self.output_layer = nn.Sequential(
-            nn.Linear(emb_dim, 128),
+            nn.Linear(emb_dim, liner_dim),
             nn.ReLU(),
-            nn.Linear(128, self.num_token)
+            nn.Linear(liner_dim, self.num_token)
         )
 
         
@@ -120,6 +121,7 @@ class ReconstructionLoss(nn.Module):
 
     def __init__(self):
         super().__init__()
+        self.loss_func = nn.CrossEntropyLoss()
 
     def forward(self,y_pred, y_true, pad_id=0):
         """Compute loss.
@@ -130,7 +132,7 @@ class ReconstructionLoss(nn.Module):
             Probability of halting of shape `(max_steps, batch_size)`.
 
         y_pred : torch.Tensor
-            Predicted outputs of shape `(max,step, batch_size, seq_len, dim)`.
+            Predicted outputs of shape `(max,step, batch_size ,seq_len, dim)`.
 
         y_true : torch.Tensor
             True targets of shape `(batch_size, seq_len)`.
@@ -143,17 +145,18 @@ class ReconstructionLoss(nn.Module):
         """
         batch_size ,_ = y_true.shape
         total_loss = y_true.new_tensor(0.0)
-        
+
         for y_pred_sequence,y_true_sequence in zip(y_pred,y_true):
             y_true_sequence = y_true_sequence[1:].clone()
-            y_pred_sequence  = nn.functional.softmax(y_pred_sequence[:-1].clone(),dim=-1)
-            p_correct = y_true.new_tensor(1.0)
+            y_pred_sequence  = y_pred_sequence[:-1].clone()
+            loss = y_true.new_tensor(0.0)
+            count = y_true.new_tensor(0.0)
             
             for y_pred_token,y_true_token in zip(y_pred_sequence,y_true_sequence):
                 if y_true_token.item() != pad_id:
-                    p_correct = p_correct * y_pred_token[y_true_token]
-        
-            total_loss = total_loss - torch.log(p_correct)
+                    count +=y_true.new_tensor(1.0)
+                    loss = loss + self.loss_func(torch.unsqueeze(y_pred_token,dim=0),torch.unsqueeze(y_true_token,dim=0))
+            total_loss = total_loss + loss/count 
         return total_loss/batch_size
 
 

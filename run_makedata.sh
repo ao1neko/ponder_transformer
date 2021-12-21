@@ -9,7 +9,7 @@ WOKE01="/work01/aoki0903/PonderNet/multihop_experiment"
 PYTHONHASHSEED=0 python $NUMERICAL_DIR/make_drop_format_data.py \
     $NUMERICAL_DIR/shuffle_configs/$1.json \
     $WOKE01/datas/$1.json \
-    100000
+    10000
 
 #./run_makedata.sh ponder_base
 #./run_makedata.sh multi_reasoning_depth2

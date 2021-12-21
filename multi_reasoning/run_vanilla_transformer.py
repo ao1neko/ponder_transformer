@@ -67,7 +67,7 @@ def vanilla_train(
             optimizer.zero_grad()
             pred_y = model(x, true_y, tgt_mask=tgt_mask,
                            src_key_padding_mask=src_key_padding_mask, tgt_key_padding_mask=tgt_key_padding_mask)
-            loss = loss_rec_inst(pred_y,true_y)
+            loss = loss_rec_inst(pred_y,true_y,pad_id=pad_id)
             loss.backward()
             optimizer.step()
 
@@ -92,10 +92,10 @@ def vanilla_train(
                     src_key_padding_mask = (x == pad_id)
                     tgt_key_padding_mask = (true_y == pad_id)
 
-                    pred_y = model(
-                        x, true_y, tgt_mask=tgt_mask, src_key_padding_mask=src_key_padding_mask, tgt_key_padding_mask=tgt_key_padding_mask)
+                    pred_y = model(x, true_y, tgt_mask=tgt_mask,
+                                src_key_padding_mask=src_key_padding_mask, tgt_key_padding_mask=tgt_key_padding_mask)
                     
-                    loss = loss_rec_inst(pred_y,true_y)
+                    loss = loss_rec_inst(pred_y,true_y,pad_id=pad_id)
                     valid_total_loss += loss.item()
                     valid_total_acc += calculate_acc(pred_y, true_y,pad_id=pad_id)
                 
@@ -103,7 +103,7 @@ def vanilla_train(
                 if best_accuracy < valid_total_acc/len(valid_data): 
                     best_accuracy = valid_total_acc/len(valid_data)
                     torch.save(model.state_dict(), modelsave_pass+'_state_dict.pt')
-                    
+                print(valid_total_acc)
                 writer.add_scalar("Loss/valid", valid_total_loss/len(valid_loader), epoch)
                 writer.add_scalar("Acc/valid", valid_total_acc/len(valid_data), epoch)
                 writer.flush()

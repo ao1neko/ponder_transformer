@@ -3,7 +3,7 @@
     "number_of_symbols" : 10,
     "max_number_of_question" : "inf",
     "min_value" : 0,
-    "max_value" : 9,
+    "max_value" : 2,
     "dtype" : "int",
     "output_type" : "ask_last_question",
 	"shuffle_order": true, 
@@ -18,12 +18,12 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[1, "num"]],
 		    "commutative" : true
 		}
@@ -43,12 +43,12 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[1, "num"]],
 		    "commutative" : true
 		}
@@ -68,12 +68,13 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["ModAdd","ModSub"],
+
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[1, "num"]],
 		    "commutative" : true
 		}

@@ -1,0 +1,71 @@
+PYTHONHASHSEED=0 python pretrain_save.py \
+    --epochs=1000 \
+    --max_step=10 \
+    --batch_size=128 \
+    --seed=6 \
+    --valid=true \
+    --train=true \
+    --ponder_model=false \
+    --device=cuda:1 \
+    --emb_dim=512 \
+    --liner_dim=512 \
+    --print_sample_num=3 \
+    --lr=0.01 \
+    --load_pass=best_vanilla_models_shuffle/pretrain/.pt
+
+
+
+PYTHONHASHSEED=0 python pretrain_save.py \
+    --epochs=1000 \
+    --max_step=20 \
+    --batch_size=128 \
+    --beta=0.1 \
+    --seed=6 \
+    --ponder_model=true \
+    --device=cuda:1 \
+    --valid=true \
+    --train=true \
+    --emb_dim=512 \
+    --liner_dim=512 \
+    --print_sample_num=3 \
+    --lr=0.01 \
+    --lambda_p=10 \
+    --load_pass=best_ponder_models_shuffle/pretrain/.pt
+
+
+
+
+
+PYTHONHASHSEED=0 python pretrain_load.py \
+    --epochs=100 \
+    --max_step=10 \
+    --batch_size=128 \
+    --seed=6 \
+    --valid=true \
+    --ponder_model=false \
+    --device=cuda:0 \
+    --emb_dim=512 \
+    --liner_dim=512 \
+    --lr=0.01 \
+    --print_sample_num=3 \
+    --load_pass=best_vanilla_models_shuffle/pretrain/.pt \
+    --save_pass=best_vanilla_models_shuffle/mod_depth3 \
+    --log_dir=runs_shuffle/vanilla/mod_depth3 \
+
+PYTHONHASHSEED=0 python pretrain_load.py \
+    --epochs=100 \
+    --max_step=20 \
+    --batch_size=128 \
+    --beta=0.1 \
+    --seed=6 \
+    --ponder_model=true \
+    --device=cuda:0 \
+    --valid=true \
+    --emb_dim=512 \
+    --liner_dim=512 \
+    --lr=0.0001 \
+    --lambda_p=10 \
+    --print_sample_num=3 \
+    --load_pass=best_ponder_models_shuffle/pretrain/.pt \
+    --save_pass=best_ponder_models_shuffle/mod_depth3 \
+    --log_dir=runs_shuffle/ponder/mod_depth3 \

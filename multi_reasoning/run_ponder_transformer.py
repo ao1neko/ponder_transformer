@@ -49,6 +49,7 @@ def ponder_train(
     valid_loader: DataLoader = None,
     max_step: int = 20,
     beta:float=0.1,
+    lambda_p: int=20,
     epochs: int = 30,
     pad_id: int = 0,
     sep_id: int = None,
@@ -58,7 +59,7 @@ def ponder_train(
     best_accuracy = 0.0
     loss_rec_inst = ReconstructionLoss()
     loss_reg_inst = RegularizationLoss(
-        lambda_p=1.0/max_step, max_steps=max_step, device=device)
+        lambda_p=1.0/lambda_p, max_steps=max_step, device=device)
     
     for epoch in tqdm(range(epochs)):
         total_loss = 0.0

@@ -9,7 +9,7 @@ import math
 
 class PonderTransformer(nn.Module):
     def __init__(
-        self,vocab_size ,emb_dim=512, max_steps=20, allow_halting=False,nhead=8,num_token=100
+        self,vocab_size ,emb_dim=512, max_steps=20, allow_halting=False,nhead=8,num_token=100,liner_dim=128
     ):
         """ PonderNet + Transformer
 
@@ -26,17 +26,17 @@ class PonderTransformer(nn.Module):
         self.max_steps = max_steps
         self.allow_halting = allow_halting
         self.num_token = num_token
+        self.liner_dim = liner_dim 
+        self.emb_dim = emb_dim
         
         self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
         self.pos_encoder = PositionalEncoder(d_model=emb_dim)
         self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
         self.transformer_decoder_layer = nn.TransformerDecoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=1)
-        self.transformer_decoder = nn.TransformerEncoder(self.transformer_decoder_layer, num_layers=1)
+        self.transformer_decoder = nn.TransformerDecoder(self.transformer_decoder_layer, num_layers=1)
         self.output_layer = nn.Sequential(
-            nn.Linear(emb_dim, 128),
-            nn.ReLU(),
-            nn.Linear(128, self.num_token),
+            nn.Linear(emb_dim, self.num_token)
         )
         self.lambda_layer = nn.Linear(emb_dim, 1)
 
@@ -85,8 +85,8 @@ class PonderTransformer(nn.Module):
             # Store releavant outputs
             #y_list.append(self.output_layer(x))  # (batch_size,)
             h = true_y.clone()
-            for _ in range(n):
-                h = self.transformer_decoder(tgt=h,memory=x,tgt_mask=tgt_mask,tgt_key_padding_mask=tgt_key_padding_mask)
+            #for _ in range(n):
+            h = self.transformer_decoder(tgt=h,memory=x,tgt_mask=tgt_mask,tgt_key_padding_mask=tgt_key_padding_mask)
             h = self.output_layer(h)
             y_list.append(h)
             
@@ -212,7 +212,7 @@ class PonderTransformerClassifier(nn.Module):
 
 class PonderTransformerGenerater(nn.Module):
     def __init__(
-        self,vocab_size ,emb_dim=128, max_steps=20, allow_halting=False,nhead=8,num_token=100
+        self,vocab_size ,emb_dim=128, max_steps=20, allow_halting=False,nhead=8,num_token=100,liner_dim=128
     ):
         """ PonderNet + Transformer
 
@@ -229,6 +229,7 @@ class PonderTransformerGenerater(nn.Module):
         self.max_steps = max_steps
         self.allow_halting = allow_halting
         self.num_token = num_token
+        self.liner_dim = liner_dim
         
         self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim,padding_idx=0)
         self.pos_encoder = PositionalEncoder(d_model=emb_dim)
@@ -236,9 +237,9 @@ class PonderTransformerGenerater(nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=1)
         self.lambda_layer = nn.Linear(emb_dim, 1)
         self.output_layer = nn.Sequential(
-            nn.Linear(emb_dim, 128),
+            nn.Linear(emb_dim, liner_dim),
             nn.ReLU(),
-            nn.Linear(128, self.num_token)
+            nn.Linear(liner_dim, self.num_token)
         )
 
         
@@ -302,6 +303,8 @@ class PonderTransformerGenerater(nn.Module):
 
         return y, p, halting_step
 
+
+
 class ReconstructionLoss(nn.Module):
     """Weighted average of per step losses.
 
@@ -315,6 +318,7 @@ class ReconstructionLoss(nn.Module):
 
     def __init__(self):
         super().__init__()
+        self.loss_func = nn.CrossEntropyLoss()
 
     def forward(self, p, y_pred, y_true, pad_id=0):
         """Compute loss.
@@ -346,13 +350,15 @@ class ReconstructionLoss(nn.Module):
             sample_loss = p.new_tensor(0.0)
             
             for p_item,y_pred_sequence in zip(p_n,y_pred_n):
-                y_pred_sequence  = nn.functional.softmax(y_pred_sequence[:-1].clone(),dim=-1)
-                p_correct = p.new_tensor(1.0)
-                
+                y_pred_sequence  = y_pred_sequence[:-1].clone()
+                loss = p.new_tensor(0.0)
+                count = y_true.new_tensor(0.0)
+
                 for y_pred_token,y_true_token in zip(y_pred_sequence,y_true_sequence):
                     if y_true_token.item() != pad_id:
-                        p_correct = p_correct * y_pred_token[y_true_token]
-                sample_loss = sample_loss - p_item * torch.log(p_correct)
+                        count +=y_true.new_tensor(1.0)
+                        loss = loss + self.loss_func(torch.unsqueeze(y_pred_token,dim=0),torch.unsqueeze(y_true_token,dim=0))
+                sample_loss = sample_loss + p_item * (loss/count)
             total_loss = total_loss + sample_loss
         return total_loss/batch_size
 

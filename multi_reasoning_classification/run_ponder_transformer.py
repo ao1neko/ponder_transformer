@@ -169,7 +169,7 @@ def ponder_test(
             print(f"test_acc:{test_total_acc/len(test_data)}")
             print(f"counter_h:{counter_h[1:]}")
         else:
-            counter_h = torch.zeros(3,max_step+1).to(device)
+            counter_h = torch.zeros(4,max_step+1).to(device)
             for x, true_y in test_loader:
                 x = x.to(device)
                 true_y = true_y.to(device)
@@ -190,12 +190,15 @@ def ponder_test(
                 bincount_h_depth2 = torch.bincount((x_length == 14)*h)
                 bincount_h_depth3 = torch.bincount((x_length == 20)*h)
                 bincount_h_depth4 = torch.bincount((x_length == 26)*h)
+                bincount_h_depth5 = torch.bincount((x_length == 32)*h)
                 padded_bincount_h_depth2 = F.pad(bincount_h_depth2, pad=(0,counter_h.shape[1] - bincount_h_depth2.shape[0]), mode='constant', value=0)
                 padded_bincount_h_depth3 = F.pad(bincount_h_depth3, pad=(0,counter_h.shape[1] - bincount_h_depth3.shape[0]), mode='constant', value=0)
                 padded_bincount_h_depth4 = F.pad(bincount_h_depth4, pad=(0,counter_h.shape[1] - bincount_h_depth4.shape[0]), mode='constant', value=0)
+                padded_bincount_h_depth5 = F.pad(bincount_h_depth5, pad=(0,counter_h.shape[1] - bincount_h_depth5.shape[0]), mode='constant', value=0)
                 counter_h[0] = counter_h[0] + padded_bincount_h_depth2
                 counter_h[1] = counter_h[1] + padded_bincount_h_depth3
                 counter_h[2] = counter_h[2] + padded_bincount_h_depth4
+                counter_h[3] = counter_h[3] + padded_bincount_h_depth5
             print(f"test_loss:{test_total_loss/len(test_loader)}")
             print(f"test_acc:{test_total_acc/len(test_data)}")
             print(f"counter_h:{counter_h[:,1:]}")

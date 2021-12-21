@@ -83,7 +83,6 @@ def vanilla_train(
 
                     pred_y = model(
                         x, src_key_padding_mask=src_key_padding_mask)
-                    
                     loss = loss_rec_inst(pred_y,true_y)
                     valid_total_loss += loss.item()
                     valid_total_acc += calculate_acc(pred_y, true_y,pad_id=pad_id)

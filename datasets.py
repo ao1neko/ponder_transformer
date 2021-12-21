@@ -7,6 +7,7 @@ import more_itertools
 from util import make_word_dic,make_id_dic,convert_str
 from typing import List,Dict
 import random
+import itertools
 
 class Reverse(Dataset):
     def __init__(self,data_size=100,data_dim=40,low = 0,high=10):
@@ -139,7 +140,69 @@ class MultiReasoningGenBERTData(Dataset):
         str = str.replace(" ","")
         return str
     
+     
+class SingleReasoningData(Dataset):
+    def __init__(self):
+        self.word_dic = self._make_dic()
+        self.id_dic = self._make_id_dic(self.word_dic)
+        self.data_x, self.data_y = self._make_data(self.word_dic)
+        self.x_max_len = max([len(text) for text in self.data_x])
+        self.y_max_len = max([len(text) for text in self.data_y])
+        #padding
+        for text in self.data_x:
+            text.extend([0] * (self.x_max_len - len(text)))
+        for text in self.data_y:
+            text.extend([0] * (self.y_max_len - len(text)))
+        self.data_x = torch.tensor(self.data_x)
+        self.data_y = torch.tensor(self.data_y)
+        self.vocab_size = len(self.word_dic)        
+        
+    def __len__(self):
+        return len(self.data_x)
+
+    def __getitem__(self, index):
+        return self.data_x[index], self.data_y[index]
     
+    
+    def _make_dic(self,upper_chr=True,lower_chr=True,min_value=0,max_value=9,operater=["=",",","+","-","*"],tag=["<CLS>","<SEP>"]):
+        dic = {"<PAD>":0}
+        for c in tag: dic[c] = len(dic)
+        if upper_chr == True:
+            for c in string.ascii_uppercase: dic[c] = len(dic)
+        if lower_chr == True:
+            for c in string.ascii_lowercase: dic[c] = len(dic)
+        for c in range(min_value,max_value+1): dic[str(c)] = len(dic)
+        for c in operater: dic[c] = len(dic)
+        return dic
+        
+    def _make_id_dic(self,word_dic):
+        dic = {}
+        for key,value in word_dic.items():
+            dic[value]=key
+        return dic
+    
+    def _make_data(self,word_dic,min_value:int=0,max_value:int=99):
+        list_x = []
+        list_y = []
+        for a,b in list(itertools.product(range(min_value,max_value+1),range(min_value,max_value+1))):
+            answers = []
+            answers.append(a+b)
+            answers.append(a-b)
+            for ope,answer in zip(["+","-"],answers):
+                if abs(answer) < 1000:
+                    list_x.append([word_dic["<CLS>"]]+[word_dic[c]for c in str(a)]+[word_dic[ope]]+[word_dic[c] for c in str(b)]+[word_dic["<SEP>"]]+[word_dic["="]]+[word_dic["<SEP>"]])
+                    list_y.append([word_dic["<CLS>"]]+[word_dic[c] for c in str(answer)]+[word_dic["<SEP>"]])
+        all_list = list(zip(list_x,list_y))
+        random.shuffle(all_list)
+        list_x , list_y= zip(*all_list)
+        return list_x,list_y       
+        
+    def id_to_text(self,l):
+        return [self.id_dic[id] for id in l]
+
+
+    
+       
 class MultiReasoningData(Dataset):
     def __init__(self,json_pass):
         self.word_dic = self._make_dic()

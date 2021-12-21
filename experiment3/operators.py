@@ -113,7 +113,7 @@ class ModAdd(BasicOperator):
     
     def __call__(self, arg_list, state):
         #assert len(arg_list) == 2
-        return sum(self.get_values(arg_list, state)) % 10
+        return sum(self.get_values(arg_list, state)) % 3
     
 
     def get_representation(self, arg_list, state):
@@ -126,7 +126,7 @@ class ModSub(BasicOperator):
     
     def __call__(self, arg_list, state):
         #assert len(arg_list) == 2
-        return self.func_nest(lambda a, b: (a - b) % 10, self.get_values(arg_list, state))
+        return self.func_nest(lambda a, b: (a - b) % 3, self.get_values(arg_list, state))
     
 
     def get_representation(self, arg_list, state):
@@ -145,7 +145,7 @@ class ModMul(BasicOperator):
     
     def __call__(self, arg_list, state):
         #assert len(arg_list) == 2
-        return self.func_nest(lambda a, b: (a * b) % 10 , self.get_values(arg_list, state)) 
+        return self.func_nest(lambda a, b: (a * b) % 3 , self.get_values(arg_list, state)) 
     
 
     def get_representation(self, arg_list, state):

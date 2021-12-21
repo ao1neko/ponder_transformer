@@ -31,8 +31,6 @@ def main(args):
     torch.cuda.manual_seed_all(args.seed)
     torch.backends.cudnn.deterministic = True
     #torch.set_printoptions(edgeitems=10)
-    
-    daytime = str(datetime.datetime.fromtimestamp(0))
     args_str = '_'+','.join([arg+"="+str(getattr(args, arg))
                             for arg in vars(args) if arg not in ['json_pass', 'load_pass', 'log_dir']])
     log_dir = args.log_dir
@@ -49,7 +47,7 @@ def main(args):
     loop_model = strtobool(args.loop_model)
     concated = strtobool(args.concated)
     if concated:
-        pass_list = ["multi_reasoning_depth2_mul3_sizeconst_small.json","multi_reasoning_depth3_mul3_sizeconst_small.json","multi_reasoning_depth4_mul3_sizeconst_small.json","multi_reasoning_depth5_mul3_sizeconst_small.json","multi_reasoning_depth6_mul3_sizeconst_small.json"]
+        pass_list = ["mod_depth2.json","mod_depth3.json","mod_depth4.json","mod_depth5.json"]
         all_data = ConcatedMultiReasoningData([args.json_pass + x for x in pass_list])
     else:
         all_data = MultiReasoningData(args.json_pass)  # if文で切り替える?,testはこれを分割して使用
@@ -150,7 +148,7 @@ def main(args):
                 pad_id=pad_id,
                 sep_id=sep_id,
                 writer=writer,
-                modelsave_pass='best_vanilla_models/' + daytime + args_str
+                modelsave_pass=load_pass+ args_str
             )
 
         if strtobool(args.test):

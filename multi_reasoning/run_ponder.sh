@@ -7,16 +7,29 @@ conda info -e
 WOKE01="/work01/aoki0903/PonderNet/multihop_experiment"
 
 PYTHONHASHSEED=0 python run.py \
-    --json_pass=$WOKE01/datas/$1.json \
+    --json_pass=$WOKE01/datas/ \
     --epochs=300 \
     --max_step=10 \
     --batch_size=128 \
     --beta=0.1 \
     --seed=6 \
-    --print_sample_num=3 \
+    --log_dir=runs_shuffle/ponder/num \
+    --load_pass=best_ponder_models_shuffle/num \
+    --ponder_model=true \
+    --device=cuda:2 \
     --valid=true \
-    --log_dir=runs/ponder/step5 \
-    --ponder_model=true
+    --train=true \
+    --print_sample_num=1 \
+    --test=true \
+    --emb_dim=128 \
+    --lr=0.0001 \
+    --lambda_p=8 \
 
 
-#./run_ponder.sh ponder_base
+
+#   --json_pass=$WOKE01/datas/$1.json \
+# --json_pass=$WOKE01/datas/
+#   --load_pass=best_ponder_models/depth5 \
+#  --load_pass=best_ponder_models_mul3_sizeconst_small/depth3.pt \
+#    
+#./run_ponder.sh depth3
