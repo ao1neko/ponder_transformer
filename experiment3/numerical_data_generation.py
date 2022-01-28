@@ -4,23 +4,24 @@ import itertools
 import string
 import argparse
 from copy import deepcopy
+from pathlib import Path
 from itertools import permutations, chain, count
 from pprint import pprint
 import random
+import pickle
 
 import operators
 from operators import *
 from numerical_question import NumericQuestion
-
-
+import preprocess
+import _jsonnet as jsonnet
 
 
 
 class NumericDataGenarator:
     def __init__(self, config_filepath):
-        with open(config_filepath, mode="r") as f:
-            self.config_dict = json.load(f)
-
+        self.config_dict = json.loads(jsonnet.evaluate_file(str(config_filepath)))
+        
         if not (self.config_dict["seed"] == "None"):
             assert type(self.config_dict["seed"]) is int, "Random seed is not int!"
             self.random_module = random.Random(self.config_dict["seed"])
@@ -37,27 +38,65 @@ class NumericDataGenarator:
         self.symbols = string.ascii_lowercase[:self.number_of_symbols]
         
         self.max_number_of_question = self.config_dict["max_number_of_question"]
-        
-        
-        self.max_value = self.config_dict["max_value"]
-        self.min_value = self.config_dict["min_value"]
-        self.generation_rules = self.config_dict["generation_rules"]
-        
-        
-        self.operators_dict = {o: globals()[o] for o in operators.__all__} 
-        
-        self.output_type = self.config_dict["output_type"]
         self.dtype = self.config_dict["dtype"]
 
+        self.number_file_path = self.config_dict.get("number_file_path")
+        
+
+        
+        if self.dtype == "bool":
+            self.max_value = 1
+            self.min_value = 0
+        else:
+            if self.number_file_path:
+                assert self.config_dict.get("max_value") is None, "\"max_value\" is declared..."
+                assert self.config_dict.get("min_value") is None, "\"min_value\" is declared..."
+                self.max_value = None
+                self.min_value = None
+            else:
+                self.max_value = self.config_dict["max_value"]
+                self.min_value = self.config_dict["min_value"]
+                
+        self.generation_rules = self.config_dict["generation_rules"]
+        self.operators_dict = {o: globals()[o] for o in operators.__all__} 
+        self.output_type = self.config_dict["output_type"]
+
         if self.dtype=="int":
-            self.random_func = self.random_module.randint
+            if self.number_file_path:
+                self.number_file_path = Path(self.number_file_path).expanduser()
+                with self.number_file_path.open(mode="rb") as f:
+                    number_list = pickle.load(f)
+                assert len(number_list) > 0, "Load empty list..."
+                assert all(type(n) is int for n in number_list) and type(number_list) is list, "Not integer list..."
+                
+                def rand_sample_from_list(a, b):
+                    assert (a is None) and (b is None), "Input number must be None!"
+                    return random.choice(number_list)
+                
+                self.random_func = rand_sample_from_list
+            else:
+                self.random_func = self.random_module.randint
+                
         elif self.dtype=="float":
             self.random_func = lambda a, b : round(self.random_module.uniform(a, b), 2)
+            
+        elif self.dtype == "bool":
+            def bool_rand_func(a, b):
+                assert a == 0 and b == 1, "Not bool number..."
+                return self.random_module.randint(0, 1)
+            self.random_func = bool_rand_func
         else:
             raise NotImplementedError(f"Dtype \"{self.dtype}\" in config file is not defined")
+
+
         
         self.shuffle_order = self.config_dict.get("shuffle_order", False)
-                
+
+        self.preprocess = self.config_dict.get("preprocess")
+        if self.preprocess is not None:
+            self.preprocess_func = getattr(preprocess, self.preprocess)
+        else:
+            self.preprocess_func = getattr(preprocess, "no_preprocess")
         
     def format_assert(self, format_for_assertion, operator_acceptable_formats):
         """
@@ -247,8 +286,14 @@ class NumericDataGenarator:
                     assumption_length=len(generation_rule["assignment_format"])
                 )
             }
-
+            
+            
             self.set_order(assignment_configs)
+            operator_config, assignment_configs = self.preprocess_func(
+                operator_config,
+                assignment_configs,
+                self,
+            )
             yield operator_config, assignment_configs
             
 
@@ -269,7 +314,7 @@ class NumericDataGenarator:
                 continue
             else:
                 possible_assignment_format.append(assignment_format)
-
+        
         return possible_assignment_format
                 
         
@@ -313,7 +358,6 @@ class NumericDataGenarator:
             assert generation_step_capacity > 0, "\"reasning_step:min\" must be more than \"step_wight\" of \"Substitution (format = num)\""
 
 
-            
             
             # ステップ数が(generation_step_capacity)が尽きるまで, 変数の割り当て方法を決定する
             while True:
@@ -368,6 +412,11 @@ class NumericDataGenarator:
             }
 
             self.set_order(assignment_configs)
+            operator_config, assignment_configs = self.preprocess_func(
+                operator_config,
+                assignment_configs,
+                self,
+            )
             yield operator_config, assignment_configs
 
 
@@ -394,8 +443,6 @@ class NumericDataGenarator:
         neumeric_question = NumericQuestion(
             operator_config,
             assignment_configs,
-            self.min_value,
-            self.max_value,
             self.output_type
         )
         result = neumeric_question()
@@ -456,7 +503,7 @@ class NumericDataGenarator:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("config_filepath",  help="Select config file", type = str)
+    parser.add_argument("config_filepath",  help="Select config file", type = Path)
     args = parser.parse_args()
     
     

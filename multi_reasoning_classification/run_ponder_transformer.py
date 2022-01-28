@@ -231,19 +231,18 @@ def ponder_print_sample(
     """
 
     if load_pass is not None:
-        model.load_state_dict(torch.load(load_pass)) 
+        model.load_state_dict(torch.load(load_pass))
 
     for x_item,true_y_item in zip(x,true_y):
-        x_item = torch.unsqueeze(x_item.to(device), 0)
-        true_y_item = torch.unsqueeze(true_y_item.to(device), 0)
+        x_item = torch.unsqueeze(x_item, 0).to(device)
+        true_y_item = torch.unsqueeze(true_y_item, 0).to(device)
         print(f"x:{[id2word_dic[id] for id in x_item[0].tolist()]}")
         print(f"true_y:{id2word_dic[true_y_item[0].item()]}")
 
-        src_key_padding_mask = (x== pad_id)
+        src_key_padding_mask = (x_item == pad_id)
 
 
-        pred_y, p, h = model(x_item,
-                            src_key_padding_mask=src_key_padding_mask)
+        pred_y, p, h = model(x_item,src_key_padding_mask=src_key_padding_mask)
         print(
             f"pred_y:{id2word_dic[torch.argmax(pred_y[h[0]-1][0],dim=-1).item()]}")
         print(f"halting step:{h[0]}")

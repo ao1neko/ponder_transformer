@@ -12,8 +12,8 @@ sys.path.append(os.pardir)
 
 from ponder_transformer import PonderTransformer
 from vanilla_transformer import Transformer
-from loop_transformer import LoopTransformerGenerater
-from datasets import MultiReasoningData,ConcatedMultiReasoningData,SingleReasoningData
+from loop_transformer import LoopTransformer
+from datasets import SingleReasoningBERTData
 
 
 import torch.nn.functional as F
@@ -37,17 +37,21 @@ def main(args):
     batch_size = args.batch_size
     beta = args.beta
     ponder_model = strtobool(args.ponder_model)
+    loop_model = strtobool(args.loop_model)
     if ponder_model:
-        log_dir = 'runs_shuffle/ponder/pretrain/' + args_str
-        save_pass = 'best_ponder_models_shuffle/pretrain'
+        log_dir = 'runs_pretrain/ponder/map_pretrain/' + args_str
+        save_pass = 'best_ponder_models_pretrain/pretrain'
+    elif loop_model:
+        log_dir = 'runs_pretrain/loop/pretrain/' + args_str
+        save_pass = 'best_loop_models_pretrain/pretrain'
     else:
-        log_dir = 'runs_shuffle/vanilla/pretrain/'  + args_str
-        save_pass = 'best_vanilla_models_shuffle/pretrain'
+        log_dir = 'runs_pretrain/vanilla/pretrain/'  + args_str
+        save_pass = 'best_vanilla_models_pretrain/pretrain'
         
     writer = SummaryWriter(log_dir=log_dir, comment=log_dir)
     
-    train_data = SingleReasoningData() 
-    valid_data = SingleReasoningData() 
+    train_data = SingleReasoningBERTData() 
+    valid_data = SingleReasoningBERTData() 
     train_loader = torch.utils.data.DataLoader(dataset=train_data,
                                                batch_size=batch_size,
                                                shuffle=True)
@@ -64,12 +68,14 @@ def main(args):
     if ponder_model:
         model = PonderTransformer(vocab_size=vocab_size, allow_halting=False,emb_dim=emb_dim,
                                   max_steps=max_step, num_token=vocab_size,liner_dim=liner_dim).to(device)
+    elif loop_model:
+        model = LoopTransformer(vocab_size=vocab_size,emb_dim=emb_dim,
+                            num_token=vocab_size, max_steps=max_step).to(device)
     else:
         model = Transformer(vocab_size=vocab_size,emb_dim=emb_dim,
                             num_token=vocab_size, num_layers=max_step,liner_dim=liner_dim).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr,)
-
     sep_id = train_data.word_dic["<SEP>"]
     pad_id = train_data.word_dic["<PAD>"]
 
@@ -93,7 +99,6 @@ def main(args):
                 writer=writer,
                 modelsave_pass= save_pass + args_str
             )
-        else:
             print_sample_num = args.print_sample_num
             ponder_print_sample(
                 x=train_data.data_x[:print_sample_num],
@@ -124,7 +129,6 @@ def main(args):
             writer=writer,
             modelsave_pass= save_pass + args_str
         )
-        else:
             print_sample_num = args.print_sample_num
             vanilla_print_sample(
                 x=train_data.data_x[:print_sample_num],
@@ -155,6 +159,7 @@ if __name__ == '__main__':
     parser.add_argument('--valid', default='false')
     parser.add_argument('--train', default='true')
     parser.add_argument('--ponder_model', default='true')
+    parser.add_argument('--loop_model', default='false')
     parser.add_argument('--lr',default=0.00003,type=float)
     parser.add_argument(
         '--load_pass', default=None)

@@ -1,0 +1,28 @@
+{
+    "seed" : 615,
+    "number_of_symbols" : 5,
+    "max_number_of_question" : 10,
+    "dtype" : "int",
+    "output_type" : "ask_last_question",
+	"shuffle_order": true, 
+	"number_file_path": "/work01/aoki0903/PonderNet/multihop_experiment/datas/valid_numbers.pkl",
+
+
+    "generation_rules" : [
+	{
+	    "type" : "template",
+	    "selection_probability" : 1.0,
+	    "assignment_format" : [   
+		{
+		    "type" : "Substitution",
+		    "format" : ["num"]
+		}
+	    ],    
+	    "operator" : {
+		"type" : ["Check"],
+		"selection_probabilities" : [1.0], 
+		"format" : [0]
+	    }
+	}
+    ]
+}

@@ -93,7 +93,6 @@ def main(args):
                 writer=writer,
                 modelsave_pass= save_pass + args_str
             )
-        else:
             print_sample_num = args.print_sample_num
             ponder_print_sample(
                 x=all_data.data_x[:print_sample_num],
@@ -124,7 +123,6 @@ def main(args):
             writer=writer,
             modelsave_pass= save_pass + args_str
         )
-        else:
             print_sample_num = args.print_sample_num
             vanilla_print_sample(
                 x=all_data.data_x[:print_sample_num],

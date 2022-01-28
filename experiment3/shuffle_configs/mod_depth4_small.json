@@ -11,22 +11,56 @@
     "generation_rules" : [
 	{
 	    "type" : "template",
-	    "selection_probability" : 0.333333,
+	    "selection_probability" : 0.25,
 	    "assignment_format" : [   
 		{
 		    "type" : "Substitution",
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
-
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[0, "num"]],
 		    "commutative" : false
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
-
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[1, "num"]],
+		    "commutative" : false
+		},
+		{
+		    "type" : ["ModAdd","ModSub"],
+		    "format" : [[2, "num"]],
+		    "commutative" : false
+		}
+
+	    ],    
+	    "operator" : {
+		"type" : ["Check"],
+		"selection_probabilities" : [1.0], 
+		"format" : [3]
+	    }
+	},
+	{
+	    "type" : "template",
+	    "selection_probability" : 0.25,
+	    "assignment_format" : [   
+		{
+		    "type" : "Substitution",
+		    "format" : ["num"]
+		},
+		{
+		    "type" : ["ModAdd","ModSub"],
+		    "format" : [[0, "num"]],
+		    "commutative" : false
+		},
+		{
+		    "type" : ["ModAdd","ModSub"],
+		    "format" : [[1, "num"]],
+		    "commutative" : false
+		},
+		{
+		    "type" : ["ModAdd","ModSub"],
+		    "format" : [[2, "num"]],
 		    "commutative" : false
 		}
 	    ],    
@@ -38,22 +72,25 @@
 	},
 	{
 	    "type" : "template",
-	    "selection_probability" : 0.3333333,
+	    "selection_probability" : 0.25,
 	    "assignment_format" : [   
 		{
 		    "type" : "Substitution",
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
-
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[0, "num"]],
 		    "commutative" : false
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
-
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[1, "num"]],
+		    "commutative" : false
+		},
+		{
+		    "type" : ["ModAdd","ModSub"],
+		    "format" : [[2, "num"]],
 		    "commutative" : false
 		}
 	    ],    
@@ -65,22 +102,25 @@
 	},
 	{
 	    "type" : "template",
-	    "selection_probability" : 0.333333,
+	    "selection_probability" : 0.25,
 	    "assignment_format" : [   
 		{
 		    "type" : "Substitution",
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
-
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[0, "num"]],
 		    "commutative" : false
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
-
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[1, "num"]],
+		    "commutative" : false
+		},
+		{
+		    "type" : ["ModAdd","ModSub"],
+		    "format" : [[2, "num"]],
 		    "commutative" : false
 		}
 	    ],    

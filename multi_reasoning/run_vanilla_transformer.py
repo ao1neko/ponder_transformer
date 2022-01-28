@@ -64,11 +64,14 @@ def vanilla_train(
             tgt_mask = make_tgt_mask(true_y.shape[1]).to(device)
             src_key_padding_mask = (x == pad_id)
             tgt_key_padding_mask = (true_y == pad_id)
+            
+            
             optimizer.zero_grad()
             pred_y = model(x, true_y, tgt_mask=tgt_mask,
                            src_key_padding_mask=src_key_padding_mask, tgt_key_padding_mask=tgt_key_padding_mask)
             loss = loss_rec_inst(pred_y,true_y,pad_id=pad_id)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
 
             total_loss += loss.item()

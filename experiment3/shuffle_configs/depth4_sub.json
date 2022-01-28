@@ -3,7 +3,7 @@
     "number_of_symbols" : 5,
     "max_number_of_question" : "inf",
     "min_value" : 0,
-    "max_value" : 99,
+    "max_value" : 9,
     "dtype" : "int",
     "output_type" : "ask_last_question",
 	"shuffle_order": true, 
@@ -11,75 +11,31 @@
     "generation_rules" : [
 	{
 	    "type" : "template",
-	    "selection_probability" : 0.2,
+	    "selection_probability" : 0.25,
 	    "assignment_format" : [   
 		{
 		    "type" : "Substitution",
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["Add"],
-		    "format" : [[0, "num"]],
-		    "commutative" : true
-		},
-		{
-		    "type" : ["Add"],
-
-		    "format" : [[1, "num"]],
-		    "commutative" : true
-		},
-		{
-		    "type" : ["Add"],
-
-		    "format" : [[2, "num"]],
-		    "commutative" : true
-		},
-		{
-		    "type" : ["Add"],
-
-		    "format" : [[3, "num"]],
-		    "commutative" : true
-		}
-
-	    ],    
-	    "operator" : {
-		"type" : ["Check"],
-		"selection_probabilities" : [1.0], 
-		"format" : [4]
-	    }
-	},
-	{
-	    "type" : "template",
-	    "selection_probability" : 0.2,
-	    "assignment_format" : [   
-		{
-		    "type" : "Substitution",
-		    "format" : ["num"]
-		},
-		{
-		    "type" : ["Add"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[1, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[2, "num"]],
 		    "commutative" : true
-		},
-		{
-		    "type" : ["Add"],
-
-		    "format" : [[3, "num"]],
-		    "commutative" : true
 		}
+
 	    ],    
 	    "operator" : {
 		"type" : ["Check"],
@@ -89,34 +45,28 @@
 	},
 	{
 	    "type" : "template",
-	    "selection_probability" : 0.2,
+	    "selection_probability" : 0.25,
 	    "assignment_format" : [   
 		{
 		    "type" : "Substitution",
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["Add"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[1, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[2, "num"]],
-		    "commutative" : true
-		},
-		{
-		    "type" : ["Add"],
-
-		    "format" : [[3, "num"]],
 		    "commutative" : true
 		}
 	    ],    
@@ -128,34 +78,28 @@
 	},
 	{
 	    "type" : "template",
-	    "selection_probability" : 0.2,
+	    "selection_probability" : 0.25,
 	    "assignment_format" : [   
 		{
 		    "type" : "Substitution",
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["Add"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[1, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[2, "num"]],
-		    "commutative" : true
-		},
-		{
-		    "type" : ["Add"],
-
-		    "format" : [[3, "num"]],
 		    "commutative" : true
 		}
 	    ],    
@@ -167,34 +111,28 @@
 	},
 	{
 	    "type" : "template",
-	    "selection_probability" : 0.2,
+	    "selection_probability" : 0.25,
 	    "assignment_format" : [   
 		{
 		    "type" : "Substitution",
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["Add"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[1, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[2, "num"]],
-		    "commutative" : true
-		},
-		{
-		    "type" : ["Add"],
-
-		    "format" : [[3, "num"]],
 		    "commutative" : true
 		}
 	    ],    

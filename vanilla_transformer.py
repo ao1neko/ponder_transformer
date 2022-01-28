@@ -3,7 +3,8 @@ import argparse
 import torch
 import torch.nn as nn
 from util import make_tgt_mask, PositionalEncoder
-
+from einops import rearrange, repeat
+import math
 
 class Transformer(nn.Module):
     def __init__(
@@ -21,21 +22,29 @@ class Transformer(nn.Module):
         super().__init__()
         self.num_token = num_token
         self.liner_dim = liner_dim
+        self.emb_dim = emb_dim
         
         self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
         self.pos_encoder = PositionalEncoder(d_model=emb_dim)
-        self.transformer = nn.Transformer(d_model=emb_dim,nhead=nhead,num_encoder_layers=num_layers,num_decoder_layers=1,batch_first=True)
-        self.output_layer = nn.Sequential(
-            nn.Linear(emb_dim, self.num_token),
-        )
+        self.transformer = nn.Transformer(d_model=emb_dim,nhead=nhead,num_encoder_layers=num_layers,num_decoder_layers=num_layers,batch_first=True)
+        self.output_layer = nn.Linear(emb_dim, self.num_token)
+        
+        self.init_weights()
+
+    def init_weights(self) -> None:
+        initrange = 0.1
+        self.embedding.weight.data.uniform_(-initrange, initrange)
+        self.output_layer.bias.data.zero_()
+        self.output_layer.weight.data.uniform_(-initrange, initrange)
 
         
     def forward(self, x:torch.Tensor,true_y:torch.Tensor,tgt_mask:torch.Tensor,src_key_padding_mask = None,tgt_key_padding_mask=None):
         x = self.embedding(x)
-        true_y = self.embedding(true_y)   
         x = self.pos_encoder(x)
+        true_y = self.embedding(true_y) 
         true_y = self.pos_encoder(true_y)
-        y = self.transformer(x,true_y,tgt_mask=tgt_mask,src_key_padding_mask=src_key_padding_mask,tgt_key_padding_mask=tgt_key_padding_mask)
+
+        y = self.transformer(x,true_y,tgt_mask=tgt_mask,src_key_padding_mask=src_key_padding_mask,tgt_key_padding_mask=tgt_key_padding_mask,memory_key_padding_mask=src_key_padding_mask)
         y = self.output_layer(y)
         return y
 
@@ -93,12 +102,14 @@ class TransformerGenerater(nn.Module):
         self.pos_encoder = PositionalEncoder(d_model=emb_dim)
         self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=emb_dim,nhead=nhead,batch_first=True)
         self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=num_layers)
-        self.output_layer = nn.Sequential(
-            nn.Linear(emb_dim, liner_dim),
-            nn.ReLU(),
-            nn.Linear(liner_dim, self.num_token)
-        )
+        self.output_layer = nn.Linear(emb_dim, self.num_token)
+        self.init_weights()
 
+    def init_weights(self) -> None:
+        initrange = 0.1
+        self.embedding.weight.data.uniform_(-initrange, initrange)
+        self.output_layer.bias.data.zero_()
+        self.output_layer.weight.data.uniform_(-initrange, initrange)
         
     def forward(self, x:torch.Tensor,src_key_padding_mask = None):
         x = self.embedding(x)
@@ -121,7 +132,7 @@ class ReconstructionLoss(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.loss_func = nn.CrossEntropyLoss()
+        self.loss_func = nn.CrossEntropyLoss(reduction='none')
 
     def forward(self,y_pred, y_true, pad_id=0):
         """Compute loss.
@@ -143,21 +154,13 @@ class ReconstructionLoss(nn.Module):
             Scalar representing the reconstruction loss. It is nothing else
             than a weighted sum of per step losses.
         """
-        batch_size ,_ = y_true.shape
-        total_loss = y_true.new_tensor(0.0)
-
-        for y_pred_sequence,y_true_sequence in zip(y_pred,y_true):
-            y_true_sequence = y_true_sequence[1:].clone()
-            y_pred_sequence  = y_pred_sequence[:-1].clone()
-            loss = y_true.new_tensor(0.0)
-            count = y_true.new_tensor(0.0)
-            
-            for y_pred_token,y_true_token in zip(y_pred_sequence,y_true_sequence):
-                if y_true_token.item() != pad_id:
-                    count +=y_true.new_tensor(1.0)
-                    loss = loss + self.loss_func(torch.unsqueeze(y_pred_token,dim=0),torch.unsqueeze(y_true_token,dim=0))
-            total_loss = total_loss + loss/count 
-        return total_loss/batch_size
+        y_true_sequence = y_true[:,1:].clone()
+        y_pred_sequence  = y_pred[:,:-1].clone()
+        y_pred_sequence = rearrange(y_pred_sequence, 'b s d-> b d s')
+        mask = (y_true_sequence != pad_id).float()
+        
+        return (((self.loss_func(y_pred_sequence,y_true_sequence)*mask).sum(dim=-1))/torch.count_nonzero(mask,dim=-1)).mean()
+        #return (self.loss_func(y_pred_sequence,y_true_sequence)*mask).sum(dim=-1).mean()
 
 
    
@@ -200,8 +203,9 @@ class ClassifyingReconstructionLoss(nn.Module):
 
 
 def main():
-    vocab_size = 500
+    vocab_size = 100
     model = Transformer(vocab_size=vocab_size,num_layers=1)
+    
     x = torch.randint(low=0,high=vocab_size-1,size=(2,50))
     true_y = torch.randint(low=0,high=vocab_size-1,size=(2,5))
     tgt_mask = make_tgt_mask(5)

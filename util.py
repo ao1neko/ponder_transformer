@@ -3,6 +3,11 @@ import torch
 from typing import List, Dict
 import json
 import math
+from torch.nn import Parameter
+import torch.nn.functional as F
+from einops import rearrange, repeat
+import random
+from fairseq import utils
 
 
 def make_tgt_mask(sz:int)->torch.Tensor:
@@ -45,7 +50,7 @@ def convert_str(str:str):
 
 
 class PositionalEncoder(torch.nn.Module):
-    def __init__(self, d_model, max_seq_len=50):
+    def __init__(self, d_model, max_seq_len=1000):
         super().__init__()
         self.d_model = d_model
         pe = torch.zeros(max_seq_len, d_model)
@@ -65,3 +70,29 @@ class PositionalEncoder(torch.nn.Module):
             pe = self.pe[:, :seq_len]
             x = x + pe
             return x
+                
+
+class RandomPositionalEncoder(torch.nn.Module):
+    def __init__(self, d_model, max_seq_len=1000):
+        super().__init__()
+        self.d_model = d_model
+        pe = torch.zeros(max_seq_len, d_model)
+        for pos in range(max_seq_len):
+            for i in range(0, d_model, 2):
+                pe[pos, i] = \
+                    math.sin(pos / (10000 ** ((2 * i) / d_model)))
+                pe[pos, i + 1] = \
+                    math.cos(pos / (10000 ** ((2 * (i + 1)) / d_model)))
+        pe = pe.unsqueeze(0)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        with torch.no_grad():
+            k = random.randint(0, 500)
+            x = x * math.sqrt(self.d_model)
+            seq_len = x.size(1)
+            pe = self.pe[:, k:seq_len+k]
+            x = x + pe
+            return x
+
+

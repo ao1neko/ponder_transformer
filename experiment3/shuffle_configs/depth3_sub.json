@@ -1,6 +1,6 @@
 {
     "seed" : 616,
-    "number_of_symbols" : 4,
+    "number_of_symbols" : 5,
     "max_number_of_question" : "inf",
     "min_value" : 0,
     "max_value" : 9,
@@ -18,16 +18,16 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[0, "num"]],
-		    "commutative" : false
+		    "commutative" : true
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[1, "num"]],
-		    "commutative" : false
+		    "commutative" : true
 		}
 	    ],    
 	    "operator" : {
@@ -45,16 +45,16 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[0, "num"]],
-		    "commutative" : false
+		    "commutative" : true
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[1, "num"]],
-		    "commutative" : false
+		    "commutative" : true
 		}
 	    ],    
 	    "operator" : {
@@ -72,16 +72,16 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[0, "num"]],
-		    "commutative" : false
+		    "commutative" : true
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
+		    "type" : ["Add","Sub"],
 
 		    "format" : [[1, "num"]],
-		    "commutative" : false
+		    "commutative" : true
 		}
 	    ],    
 	    "operator" : {

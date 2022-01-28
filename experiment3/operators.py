@@ -1,17 +1,23 @@
-from basic_operator import BasicOperator
+from functools import reduce
 
+from basic_operator import BasicOperator
+from operator_tools import *
 
 """
  定義したクラスを必ず追加してください. (operaterとして用いない場合は不要です. )
- """
-__all__ = ["Substitution", "Check", "Add", "Sub","Mul","ModAdd", "ModSub","ModMul", "WhoMax", "PseudoAdd", "NoQuestion", "Max"]
+"""
+__all__ = ["Substitution", "Check", "Add", "Sub", "WhoMax", "PseudoAdd", "NoQuestion", "Max", "Min", "AND", "OR", "NAND", "NOR", "XOR", "Implication"]
+
+
+
+
 
 class Substitution(BasicOperator):
     arg_formats = ["num", "var"]
 
     def __call__(self, arg_list, state):
         assert len(arg_list) == 1, "lehgth of arg_list must be 1 when you use \"Substitution\"."
-        return self.get_values(arg_list, state)[0]
+        return get_values(arg_list, state)[0]
     
 
     def get_representation(self, arg_list, state):
@@ -53,11 +59,11 @@ class Add(BasicOperator):
     
     def __call__(self, arg_list, state):
         #assert len(arg_list) == 2
-        return sum(self.get_values(arg_list, state))
+        return sum(get_values(arg_list, state))
     
 
     def get_representation(self, arg_list, state):
-        return " + ".join(map(str, arg_list))
+        return " + ".join(map(num2str, arg_list))
 
 
 
@@ -66,107 +72,40 @@ class Sub(BasicOperator):
     
     def __call__(self, arg_list, state):
         #assert len(arg_list) == 2
-        return self.func_nest(lambda a, b: a - b, self.get_values(arg_list, state))
+        return func_nest(lambda a, b: a - b, get_values(arg_list, state))
     
 
     def get_representation(self, arg_list, state):
-        return " - ".join(map(str, arg_list))
+        return " - ".join(map(num2str, arg_list))
 
 
-    def func_nest(self, f, iterable):
-        input_iter = iter(iterable)
-        temp_value = next(input_iter)
-        for v in input_iter:
-            temp_value = f(temp_value, v)
-        return temp_value
 
-class Mul(BasicOperator):
-    arg_formats = ["*num_var:2"]
+
+
     
-    def __call__(self, arg_list, state):
-        #assert len(arg_list) == 2
-        return self.func_nest(lambda a, b: a * b, self.get_values(arg_list, state))
-    
-
-    def get_representation(self, arg_list, state):
-        return " * ".join(map(str, arg_list))
-
-    def func_nest(self, f, iterable):
-        input_iter = iter(iterable)
-        temp_value = next(input_iter)
-        for v in input_iter:
-            temp_value = f(temp_value, v)
-        return temp_value
-
 class Max(BasicOperator):
     arg_formats = ["*num_var:1"]
     
     def __call__(self, arg_list, state):
-        return max(self.get_values(arg_list, state))
+        return max(get_values(arg_list, state))
     
 
     def get_representation(self, arg_list, state):
-        return "max({})".format(",".join(map(str, arg_list)))
+        return " ^ ".join(map(num2str, arg_list))
 
-class ModAdd(BasicOperator):
-    arg_formats = ["*num_var:2"]
-    
-    def __call__(self, arg_list, state):
-        #assert len(arg_list) == 2
-        return sum(self.get_values(arg_list, state)) % 3
+
     
 
-    def get_representation(self, arg_list, state):
-        return " + ".join(map(str, arg_list))
-
-
-
-class ModSub(BasicOperator):
-    arg_formats = ["*num_var:2"]
-    
-    def __call__(self, arg_list, state):
-        #assert len(arg_list) == 2
-        return self.func_nest(lambda a, b: (a - b) % 3, self.get_values(arg_list, state))
-    
-
-    def get_representation(self, arg_list, state):
-        return " - ".join(map(str, arg_list)) 
-
-
-    def func_nest(self, f, iterable):
-        input_iter = iter(iterable)
-        temp_value = next(input_iter)
-        for v in input_iter:
-            temp_value = f(temp_value, v)
-        return temp_value
-
-class ModMul(BasicOperator):
-    arg_formats = ["*num_var:2"]
-    
-    def __call__(self, arg_list, state):
-        #assert len(arg_list) == 2
-        return self.func_nest(lambda a, b: (a * b) % 3 , self.get_values(arg_list, state)) 
-    
-
-    def get_representation(self, arg_list, state):
-        return " * ".join(map(str, arg_list))
-
-    def func_nest(self, f, iterable):
-        input_iter = iter(iterable)
-        temp_value = next(input_iter)
-        for v in input_iter:
-            temp_value = f(temp_value, v)
-        return temp_value
-
-class Max(BasicOperator):
+class Min(BasicOperator):
     arg_formats = ["*num_var:1"]
     
     def __call__(self, arg_list, state):
-        return max(self.get_values(arg_list, state))
+        return max(get_values(arg_list, state))
     
 
     def get_representation(self, arg_list, state):
-        return "max({})".format(",".join(map(str, arg_list)))
+        return " * ".join(map(num2str, arg_list))
+
 
 
 
@@ -176,18 +115,18 @@ class WhoMax(BasicOperator):
     arg_formats = ["*var:1"]
     
     def __call__(self, arg_list, state):
-        return sorted(zip(arg_list, self.get_values(arg_list, state)), key=lambda x: x[1], reverse=True)[0][0]
+        return sorted(zip(arg_list, get_values(arg_list, state)), key=lambda x: x[1], reverse=True)[0][0]
     
 
     def get_representation(self, arg_list, state):
-        return "who_max({})".format(",".join(map(str, arg_list)))
+        return "who_max({})".format(",".join(map(num2str, arg_list)))
     
 
     
 class PseudoAdd(Add):
     
     def get_representation(self, arg_list, state):
-        return " + ".join(map(str, self.get_values(arg_list, state)))
+        return " + ".join(map(num2str, get_values(arg_list, state)))
 
 
 
@@ -201,3 +140,92 @@ class NoQuestion(BasicOperator):
 
     def get_representation(self, arg_list, state):
         return None
+
+
+
+    
+class OR(BasicOperator):
+    arg_formats = ["*num_var:2"]
+    
+    def __call__(self, arg_list, state):
+        values = get_values(arg_list, state)
+        assert all(map(lambda x: x == 0 or x == 1, values)), "Not bool number..."
+        return int(reduce(lambda a, b: a or b, values))
+    
+
+    def get_representation(self, arg_list, state):
+        return " | ".join(map(num2str, arg_list))
+
+
+class AND(BasicOperator):
+    arg_formats = ["*num_var:2"]
+    
+    def __call__(self, arg_list, state):
+        values = get_values(arg_list, state)
+        assert all(map(lambda x: x == 0 or x == 1, values)), "Not bool number..."
+        return int(reduce(lambda a, b: a and b, values))
+    
+
+    def get_representation(self, arg_list, state):
+        return " & ".join(map(num2str, arg_list))
+
+
+class XOR(BasicOperator):
+    arg_formats = ["*num_var:2"]
+    
+    def __call__(self, arg_list, state):
+        values = get_values(arg_list, state)
+        assert all(map(lambda x: x == 0 or x == 1, values)), "Not bool number..."
+        return int(reduce(lambda a, b: a ^ b, values))
+    
+
+    def get_representation(self, arg_list, state):
+        return " ^ ".join(map(num2str, arg_list))
+
+
+
+
+class NOR(OR):
+    arg_formats = ["*num_var:2"]
+    
+    def __call__(self, arg_list, state):
+        return int(not super().__call__(arg_list, state))    
+
+    def get_representation(self, arg_list, state):
+        return " + ".join(map(num2str, arg_list))
+
+
+
+class NAND(AND):
+    arg_formats = ["*num_var:2"]
+    
+    def __call__(self, arg_list, state):
+        return int(not super().__call__(arg_list, state))
+
+    def get_representation(self, arg_list, state):
+        return " * ".join(map(num2str, arg_list))
+
+
+class Implication(BasicOperator):
+    arg_formats = ["*num_var:2"]
+
+    def __call__(self, arg_list, state):
+        values = get_values(arg_list, state)
+        assert all(map(lambda x: x == 0 or x == 1, values)), "Not bool number..."
+        return int(reduce(lambda a, b: (not a) or b, values))
+    
+    
+    def get_representation(self, arg_list, state):
+        return " > ".join(map(num2str, arg_list))
+
+
+
+
+
+
+
+
+
+
+
+    

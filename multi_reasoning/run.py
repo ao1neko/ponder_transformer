@@ -12,7 +12,7 @@ sys.path.append(os.pardir)
 
 from ponder_transformer import PonderTransformer
 from vanilla_transformer import Transformer
-from datasets import MultiReasoningGenBERTData,SingleReasoningData
+from datasets import MultiReasoningGenBERTData,SingleReasoningBERTData
 import torch.nn.functional as F
 
 from torch.utils.tensorboard import SummaryWriter
@@ -42,7 +42,7 @@ def main(args):
     beta = args.beta
     ponder_model = strtobool(args.ponder_model)
 
-    all_data = SingleReasoningData()  # if文で切り替える?,testはこれを分割して使用
+    all_data = SingleReasoningBERTData()  # if文で切り替える?,testはこれを分割して使用
     all_data_len = len(all_data)  # n_samples is 60000
     train_len = int(all_data_len * 0.8)
     train_indices = list(range(0, train_len))  # [0,1,.....47999]
@@ -101,8 +101,8 @@ def main(args):
         if strtobool(args.test):
             ponder_test(
                 model=model,
-                test_data=valid_data,
-                test_loader=valid_loader,
+                test_data=train_data,
+                test_loader=train_loader,
                 max_step=max_step,
                 device=device,
                 load_pass=load_pass,

@@ -76,7 +76,7 @@ def apply_commutative(operator_format):
 
 
 def is_num(s, dtype):
-    if dtype == "int":
+    if dtype == "int" or dtype == "bool":
         try:
             int(s)
         except ValueError:
@@ -87,7 +87,7 @@ def is_num(s, dtype):
         except ValueError:
             return False
     else:
-        raise NotImplementedError()
+        raise NotImplementedError(dtype)
 
     return True
 

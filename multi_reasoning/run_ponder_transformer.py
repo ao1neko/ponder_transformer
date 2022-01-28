@@ -5,11 +5,86 @@ import torch.optim as optim
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from ponder_transformer import ReconstructionLoss, RegularizationLoss
+from ponder_transformer import ReconstructionLoss, RegularizationLoss, MyRegularizationLoss
 from util import make_tgt_mask
 import torch.nn.functional as F
 from einops import rearrange
+import re
 from torch.utils.tensorboard import SummaryWriter
+
+def flager(x,id_dic):
+    """
+    0:式の数=1
+    1:式の数=2,dummy=1
+    2:式の数=2
+    """
+    x = "".join([id_dic[x_id.item()] for x_id in x[0]])
+    x = x.replace("<PAD>","")
+    x = x[5:-5]
+    x, y = x.split("<SEP>")
+    if len(x.split(",")) == 1:
+        return 0
+    elif len(x.split(",")) == 2:
+        eq1, eq2 = x.split(",")
+        if y in eq1:
+            return 1 if len(re.split('[-+]', eq1)) == 1 else  2
+        else:
+            return 1 if len(re.split('[-+]', eq2)) == 1 else  2
+    else:
+        return 3
+        
+def flager2(x,id_dic):
+    """
+    0:式の数=1
+    1:式の数=2,かつsummy=1かつ左に存在
+    2:式の数=2
+    """
+    x = "".join([id_dic[x_id.item()] for x_id in x[0]])
+    x = x.replace("<PAD>","")
+    x = x[5:-5]
+    x, y = x.split("<SEP>")
+    if len(x.split(",")) == 1:
+        return 0
+    else:
+        eq1, eq2 = x.split(",")
+        if y in eq1 and len(re.split('[-+]', eq1)) == 1:
+            return 1 
+        else:
+            return 2       
+      
+
+
+def flager3(x,id_dic):
+    """
+    0:式の数=1
+    1:式の数=2,dummy=1
+    2:式の数=2
+    """
+    x = "".join([id_dic[x_id.item()] for x_id in x[0]])
+    x = x.replace("<PAD>","")
+    x = x[5:-5]
+    x, y = x.split("<SEP>")
+    if len(x.split(",")) == 1:
+        return 0
+    elif len(x.split(",")) == 2:
+        return  2
+    else:
+        return 3    
+
+
+def flager4(x,id_dic):
+    """
+    0:式の数=1
+    1:式の数=2,かつsummy=1かつ左に存在
+    2:式の数=2
+    """
+    x = "".join([id_dic[x_id.item()] for x_id in x[0]])
+    x = x.replace("<PAD>","")
+    x = x[5:-5]
+    x, y = x.split("<SEP>")
+    return len(x.split(",")) - 1
+
+
 
 def calculate_acc(pred_y:torch.Tensor,true_y:torch.Tensor,h:torch.Tensor,pad_id=0)-> int:
     """
@@ -36,6 +111,62 @@ def calculate_acc(pred_y:torch.Tensor,true_y:torch.Tensor,h:torch.Tensor,pad_id=
         if flag == False : count += 1
 
     return count
+
+def calculate_acc2(pred_y:torch.Tensor,true_y:torch.Tensor,h:torch.Tensor,pad_id=0)-> int:
+    """
+    Args:
+        pred_y (torch.Tensor):output. shape of y is (max,step, batch_size, seq_len, dim)
+        true_y (torch.Tensor):
+        h (torch.Tensor) :
+    Returns:
+        int: num of accuracy
+    """
+  
+    count = 0
+    pred_y = rearrange(pred_y, 'n b s d-> b n s d')
+
+    for pred_y_n,true_y_sequence,h_item in zip(pred_y,true_y,h):
+        for h_item2 in range(6): 
+            pred_y_sequence = pred_y_n[h_item2]
+            
+            true_y_sequence = true_y_sequence[1:]
+            pred_y_sequence = torch.argmax(pred_y_sequence[:-1], dim=-1)
+            
+            flag = False
+            for pred_y_token,true_y_token in zip(pred_y_sequence,true_y_sequence):
+                if true_y_token.item() != pad_id and pred_y_token.item() != true_y_token.item(): flag = True
+            if flag == False : 
+                count += 1
+                break
+
+    return count
+
+def calculate_acc_abs(pred_y:torch.Tensor,true_y:torch.Tensor,h:torch.Tensor,pad_id=0)-> int:
+    """
+    Args:
+        pred_y (torch.Tensor):output. shape of y is (max,step, batch_size, seq_len, dim)
+        true_y (torch.Tensor):
+        h (torch.Tensor) :
+    Returns:
+        int: num of accuracy
+    """
+  
+    count = 0
+    pred_y = rearrange(pred_y, 'n b s d-> b n s d')
+
+    for pred_y_n,true_y_sequence,h_item in zip(pred_y,true_y,h):
+        pred_y_sequence = pred_y_n[h_item.item()-1]
+        
+        true_y_sequence = true_y_sequence[1:]
+        pred_y_sequence = torch.argmax(pred_y_sequence[:-1], dim=-1)
+        
+        flag = False
+        for pred_y_token,true_y_token in zip(pred_y_sequence,true_y_sequence):
+            if true_y_token.item() != pad_id and pred_y_token.item() != true_y_token.item(): flag = True
+        if flag == False : count += 1
+
+    return count
+
 
 def ponder_train(
     model: nn.Module,
@@ -72,27 +203,25 @@ def ponder_train(
             tgt_mask = make_tgt_mask(true_y.shape[1]).to(device)
             src_key_padding_mask = (x == pad_id)
             tgt_key_padding_mask = (true_y == pad_id)
-
+            
             optimizer.zero_grad()
             pred_y, p, h = model(x, true_y, tgt_mask=tgt_mask,
-                                 src_key_padding_mask=src_key_padding_mask, tgt_key_padding_mask=tgt_key_padding_mask)
-
-
+                                src_key_padding_mask=src_key_padding_mask, tgt_key_padding_mask=tgt_key_padding_mask)
+            
             loss_rec = loss_rec_inst(p, pred_y, true_y, pad_id=pad_id)
             loss_reg = loss_reg_inst(p,)
             loss_overall = loss_rec + beta * loss_reg
             loss_overall.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
             optimizer.step()
-
             total_loss += loss_overall.item()
             total_acc += calculate_acc(pred_y, true_y, h,pad_id=pad_id)
-        
+            
         writer.add_scalar("Loss/train", total_loss/len(train_loader), epoch)
         writer.add_scalar("Acc/train", total_acc/len(train_data), epoch)
         writer.flush()
         print(f"train_loss:{total_loss/len(train_loader)}")
         print(f"train_acc:{total_acc/len(train_data)}")
-
         if valid == True:
             with torch.no_grad():
                 model.eval()
@@ -118,8 +247,8 @@ def ponder_train(
                     valid_total_acc += calculate_acc(
                         pred_y, true_y,h, pad_id=pad_id)
                 
-                
-                if best_accuracy < valid_total_acc/len(valid_data): 
+                #TODO
+                if best_accuracy <= valid_total_acc/len(valid_data): 
                     best_accuracy = valid_total_acc/len(valid_data)
                     torch.save(model.state_dict(), modelsave_pass+'_state_dict.pt')
                     
@@ -139,9 +268,12 @@ def ponder_test(
     beta:float = 0.1,
     pad_id: int = 0,
     sep_id: int = None,
-    load_pass = None
+    load_pass = None,
+    id_dic=None,
 ):
-
+    test_loader = torch.utils.data.DataLoader(dataset=test_data,
+                                               batch_size=1,
+                                               shuffle=True)
     if load_pass is not None:
         model.load_state_dict(torch.load(load_pass)) 
 
@@ -149,13 +281,12 @@ def ponder_test(
     with torch.no_grad():
         test_total_loss = 0.0
         test_total_acc = 0.0
-        counter_h = torch.zeros(max_step+1).to(device)
-        loss_rec_inst = ReconstructionLoss()
-        loss_reg_inst = RegularizationLoss(
-            lambda_p=1.0/max_step, max_steps=max_step, device=device)
-        
-        
+        counter_h = torch.zeros(4,max_step+1).to(device)
+        counter_h_div = torch.zeros(max_step+1).to(device)
+
         for x, true_y in test_loader:
+            flag= flager4(x.clone(),id_dic)
+            #flag= flager(x.clone(),id_dic)
             x = x.to(device)
             true_y = true_y.to(device)
             tgt_mask = make_tgt_mask(true_y.shape[1]).to(device)
@@ -165,19 +296,20 @@ def ponder_test(
             pred_y, p, h = model(x, true_y, tgt_mask=tgt_mask,
                                  src_key_padding_mask=src_key_padding_mask, tgt_key_padding_mask=tgt_key_padding_mask)
 
-            loss_rec = loss_rec_inst(p, pred_y, true_y, pad_id=pad_id)
-            loss_reg = loss_reg_inst(p,)
-            loss_overall = loss_rec + beta * loss_reg
-
-            test_total_loss += loss_overall.item()
             test_total_acc += calculate_acc(pred_y, true_y, h,pad_id=pad_id)
-            bincount_h = torch.bincount(h)
-            padded_bincount_h = F.pad(bincount_h, pad=(0,counter_h.shape[0] - bincount_h.shape[0]), mode='constant', value=0)
-            counter_h = counter_h + padded_bincount_h
+            if False:
+                bincount_h = torch.bincount(h)
+                padded_bincount_h = F.pad(bincount_h, pad=(0,counter_h_div.shape[0] - bincount_h.shape[0]), mode='constant', value=0)
+                counter_h_div = counter_h_div + padded_bincount_h
+            else:
+                bincount_h = torch.bincount(h)
+                padded_bincount_h = F.pad(bincount_h, pad=(0,counter_h.shape[1] - bincount_h.shape[0]), mode='constant', value=0)
+                counter_h[flag] = counter_h[flag] + padded_bincount_h
             
         print(f"test_loss:{test_total_loss/len(test_loader)}")
         print(f"test_acc:{test_total_acc/len(test_data)}")
-        print(f"counter_h:{counter_h[1:]}")
+        print(f"counter_h:{counter_h[:,1:]}")
+        print(f"counter_h:{counter_h_div[1:]}")
 
 
 def ponder_print_sample(
@@ -221,8 +353,15 @@ def ponder_print_sample(
 
         pred_y, p, h = model(x_item, true_y_item, tgt_mask=tgt_mask,
                             src_key_padding_mask=src_key_padding_mask, tgt_key_padding_mask=tgt_key_padding_mask)
-        print(
-            f"pred_y:{['<CLS>']+[id2word_dic[id] for id in torch.argmax(pred_y[h[0]-1][0],dim=-1)[:-1].tolist()]}")
+        print(f"pred_y:{['<CLS>']+[id2word_dic[id] for id in torch.argmax(pred_y[h[0]-1][0],dim=-1)[:-1].tolist()]}")
+        """
+        print(f"pred_y:{['<CLS>']+[id2word_dic[id] for id in torch.argmax(pred_y[0][0],dim=-1)[:-1].tolist()]}")
+        print(f"pred_y:{['<CLS>']+[id2word_dic[id] for id in torch.argmax(pred_y[1][0],dim=-1)[:-1].tolist()]}")
+        print(f"pred_y:{['<CLS>']+[id2word_dic[id] for id in torch.argmax(pred_y[2][0],dim=-1)[:-1].tolist()]}")
+        print(f"pred_y:{['<CLS>']+[id2word_dic[id] for id in torch.argmax(pred_y[3][0],dim=-1)[:-1].tolist()]}")
+        print(f"pred_y:{['<CLS>']+[id2word_dic[id] for id in torch.argmax(pred_y[4][0],dim=-1)[:-1].tolist()]}")
+        print(f"pred_y:{['<CLS>']+[id2word_dic[id] for id in torch.argmax(pred_y[5][0],dim=-1)[:-1].tolist()]}")
+        """
         print(f"halting step:{h[0]}")
         print(f"halting probability:{p[:,0]}\n")
 

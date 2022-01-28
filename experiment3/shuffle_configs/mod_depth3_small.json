@@ -18,14 +18,12 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
-
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[0, "num"]],
 		    "commutative" : false
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
-
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[1, "num"]],
 		    "commutative" : false
 		}
@@ -45,14 +43,12 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
-
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[0, "num"]],
 		    "commutative" : false
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
-
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[1, "num"]],
 		    "commutative" : false
 		}
@@ -72,14 +68,12 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
-
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[0, "num"]],
 		    "commutative" : false
 		},
 		{
-		    "type" : ["ModAdd","ModSub","ModMul"],
-
+		    "type" : ["ModAdd","ModSub"],
 		    "format" : [[1, "num"]],
 		    "commutative" : false
 		}

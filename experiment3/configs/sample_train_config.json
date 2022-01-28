@@ -1,50 +1,51 @@
 {
-    "seed" : 616,
+    "seed" : 42,
     "number_of_symbols" : 26,
-    "max_number_of_question" : 100000,
-    "min_value" : 0,
-    "max_value" : 99,
+    "max_number_of_question" : "inf",
+    
     "dtype" : "int",
+    "shuffle_order": true,
+    "number_file_path": "~/work/valid_numbers.pkl",
+    
+    
     "output_type" : "ask_last_question",
 
 
     "generation_rules" : [
 	
 	{
+	    "comment": "2段の計算",
 	    "type" : "template",
-	    "selection_probability" : 1,
+	    "selection_probability" : 1.0,
 
-	    "assignment_format" : [   
+	    "assignment_format" : [
+		    
 		{
 		    "type" : "Substitution",
 		    "format" : ["num"]
 		},
+				
 		
 		{
-		    "type" : ["Add", "Sub"],
+		    "type" : ["Add"],
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
 		
 		{
-		    "type" : ["Add", "Sub"],
+		    "type" : ["Add"],
 		    "format" : [[1, "num"]],
-		    "commutative" : true
-		},
-		
-		{
-		    "type" : ["Add", "Sub"],
-		    "format" : [[2, "num"]],
 		    "commutative" : true
 		}
 		
 	    ],
+	    
 	
     
 	    "operator" : {
 		"type" : ["Check"],
 		"selection_probabilities" : [1.0], 
-		"format" : [3]
+		"format" : [-1]
 	    }
 	}
     ]

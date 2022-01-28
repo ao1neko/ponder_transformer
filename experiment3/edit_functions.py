@@ -2,9 +2,9 @@ from pprint import pprint
 from more_itertools import ilen
 from copy import deepcopy
 
-from .edit_function_tools import fill_template, apply_commutative, is_num
+from edit_function_tools import fill_template, apply_commutative, is_num
 
-__all__ = ["add_step", "add_dummy", "change_value", "change_variable", "change_variable_order", "remove_last_step", "change_digit", "chanage_operator", "change_formula_order"]
+__all__ = ["add_step", "add_dummy", "change_value", "change_variable", "change_variable_order", "remove_last_step", "change_digit", "chanage_operator", "change_formula_order", "add_step_from_midle_step"]
 
 
 def add_step(operator_config, assignment_configs, rule_dict, numerical_data_generator, random_module):
@@ -97,30 +97,39 @@ def add_dummy(operator_config, assignment_configs, rule_dict, numerical_data_gen
     assert len(candidate_symbols) >= 1, "No more symbols to use an addtional equation!"
     
     # insert_indexの前に挿入する
-    insert_index = random_module.choice(list(range(len(assignment_configs))))
-    history_configs = assignment_configs[:insert_index]
-    available_variables = [c["variable"] for c in history_configs if c["variable"] is not None]
 
-    candidates = []
-    
-    for operator_dict in rule_dict["operators"]:
-        operator_type = operator_dict["type"]
-        operator_format = list(map(lambda x: tuple(x) if type(x) is list else x, operator_dict["format"]))
+    for _ in range(10):
+        insert_index = random_module.choice(list(range(len(assignment_configs))))
+        history_configs = assignment_configs[:insert_index]
+        available_variables = [c["variable"] for c in history_configs if c["variable"] is not None]
+        candidates = []
 
-        if operator_dict.get("commutative", False):
-            operator_format = apply_commutative(operator_format)
+        for operator_dict in rule_dict["operators"]:
+            operator_type = operator_dict["type"]
+            operator_format = list(map(lambda x: tuple(x) if type(x) is list else x, operator_dict["format"]))
 
-        acceptable_format = []
-        for of in operator_format:
-            
-            if of == "var" and len(available_variables) >= 1:
-                candidates.append({"type": operator_type, "format": of})
-            elif type(of) is tuple:
-                required_var_count = ilen(filter(lambda x: x == "var", of))
-                if len(available_variables) >= required_var_count:
-                    candidates.append({"type": operator_type, "format":of})
+            if operator_dict.get("commutative", False):
+                operator_format = apply_commutative(operator_format)
                 
-    
+            acceptable_format = []
+            for of in operator_format:
+
+                if of == "num":
+                    candidates.append({"type": operator_type, "format": of})
+                elif of == "var" and len(available_variables) >= 1:
+                    candidates.append({"type": operator_type, "format": of})
+                elif type(of) is tuple:
+                    required_var_count = ilen(filter(lambda x: x == "var", of))
+                    if len(available_variables) >= required_var_count:
+                        candidates.append({"type": operator_type, "format":of})
+
+        if len(candidates):
+            break
+
+    else:
+        raise RuntimeError("No candidates were generated...")
+            
+            
     selected_oerpator_dict = random_module.choice(candidates)
     new_operator_config = fill_template(selected_oerpator_dict, candidate_symbols, available_variables, numerical_data_generator, random_module, use_index=False)
 
@@ -342,6 +351,7 @@ def remove_last_step(operator_config, assignment_configs, rule_dict, numerical_d
 
 
 def change_digit(operator_config, assignment_configs, rule_dict, numerical_data_generator, random_module):
+    assert numerical_data_generator.dtype == "int", "Support only \"int\"..."
     operator_config = deepcopy(operator_config)
     assignment_configs = deepcopy(assignment_configs)
     
@@ -452,7 +462,7 @@ def chanage_operator(operator_config, assignment_configs, rule_dict, numerical_d
             rule_dict["operator_convert_rules"]
         )
     )
-    assert len(convert_rule_candidates) == 1, "No appropriate rule is exist..."
+    assert len(convert_rule_candidates)  > 0, "No appropriate rule is exist..."
 
     selected_rule = random_module.choice(convert_rule_candidates)
     combined_configs[selected_config_index]["type"] = selected_rule["after"]
@@ -479,6 +489,32 @@ def change_formula_order(operator_config, assignment_configs, rule_dict, numeric
         conf["repr_index"] = index
 
     return operator_config, assignment_configs
+
+
+
+
+def add_step_from_midle_step(operator_config, assignment_configs, rule_dict, numerical_data_generator, random_module):
+    operator_config = deepcopy(operator_config)
+    assignment_configs = deepcopy(assignment_configs)
+
+    assert operator_config["ope"] == "Check", "Only support \"Check\" for assignment_configs[\"ope\"]"
+
+    check_variable = operator_config["format"][0]
+    check_target_conf = list(filter(lambda d: d["variable"] == check_variable, assignment_configs))
+    
+    assert len(check_target_conf) == 1, "There are more than 2 configs as target"
+    check_target_conf = check_target_conf[0]
+
+    new_check_target_index = check_target_conf["reasning_index"] + 1
+    assert new_check_target_index < len(assignment_configs), "\"new_check_target_index\" is out of range..."
+
+    operator_config["format"] = [assignment_configs[new_check_target_index]["variable"]]
+    
+    return operator_config, assignment_configs
+
+
+
+
 
 
 

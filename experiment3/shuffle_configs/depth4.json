@@ -1,9 +1,7 @@
 {
     "seed" : 616,
-    "number_of_symbols" : 10,
+    "number_of_symbols" : 5,
     "max_number_of_question" : "inf",
-    "min_value" : 0,
-    "max_value" : 2,
     "dtype" : "int",
     "output_type" : "ask_last_question",
 	"shuffle_order": true, 
@@ -18,17 +16,17 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[1, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[2, "num"]],
 		    "commutative" : true
 		}
@@ -49,17 +47,17 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[1, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[2, "num"]],
 		    "commutative" : true
 		}
@@ -79,17 +77,17 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[1, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[2, "num"]],
 		    "commutative" : true
 		}
@@ -109,17 +107,17 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[1, "num"]],
 		    "commutative" : true
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[2, "num"]],
 		    "commutative" : true
 		}

@@ -5,7 +5,7 @@ import operators
 from operators import *
 
 class NumericQuestion:
-    def __init__(self, operator_config, assignment_config, min_value, max_value, output_type):
+    def __init__(self, operator_config, assignment_config, output_type):
         
         self.ope = operator_config["ope"]
         assert self.ope in operators.__all__, f"operator \"{ope}\" is not defined"
@@ -21,8 +21,6 @@ class NumericQuestion:
         self.substitution_operator_dict = {}
         self.final_state = None
         self.ans = None
-        self.max_value = max_value
-        self.min_value = min_value
         self.output_type = output_type
         self.calculated = False
 

@@ -13,7 +13,7 @@ sys.path.append(os.pardir)
 from ponder_transformer import PonderTransformerGenerater
 from vanilla_transformer import TransformerGenerater
 from loop_transformer import LoopTransformerGenerater
-from datasets import MultiReasoningData,ConcatedMultiReasoningData
+from datasets import MultiReasoningData,ConcatedMultiReasoningData,SingleReasoningData
 
 
 import torch.nn.functional as F
@@ -46,12 +46,15 @@ def main(args):
     ponder_model = strtobool(args.ponder_model)
     loop_model = strtobool(args.loop_model)
     concated = strtobool(args.concated)
+    single = strtobool(args.single)
     if concated:
-        pass_list = ["mod_depth2.json","mod_depth3.json","mod_depth4.json","mod_depth5.json"]
+        pass_list = ["mod_depth2_small.json","mod_depth3_small.json","mod_depth1_small.json"]
         all_data = ConcatedMultiReasoningData([args.json_pass + x for x in pass_list])
+    elif single:
+        all_data = SingleReasoningData() 
     else:
         all_data = MultiReasoningData(args.json_pass)  # if文で切り替える?,testはこれを分割して使用
-    
+        
     all_data_len = len(all_data)  # n_samples is 60000
     train_len = int(all_data_len * 0.8)
     train_indices = list(range(0, train_len))  # [0,1,.....47999]
@@ -199,6 +202,7 @@ if __name__ == '__main__':
     parser.add_argument('--print_sample_num', default=0, type=int)
     parser.add_argument('--ponder_model', default='true')
     parser.add_argument('--concated', default='false')
+    parser.add_argument('--single', default='false')
     parser.add_argument('--loop_model', default='false')
     parser.add_argument('--lr',default=0.00003,type=float)
     args = parser.parse_args()

@@ -1,12 +1,11 @@
 {
     "seed" : 615,
-    "number_of_symbols" : 10,
-    "max_number_of_question" : "inf",
-    "min_value" : 0,
-    "max_value" : 2,
+    "number_of_symbols" : 5,
+    "max_number_of_question" : 1000,
     "dtype" : "int",
     "output_type" : "ask_last_question",
 	"shuffle_order": true, 
+	"number_file_path": "/work01/aoki0903/PonderNet/multihop_experiment/datas/valid_numbers.pkl",
 
     "generation_rules" : [
 	{
@@ -18,7 +17,7 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		}
@@ -38,7 +37,7 @@
 		    "format" : ["num"]
 		},
 		{
-		    "type" : ["Add","Sub","Mul"],
+		    "type" : ["Add"],
 		    "format" : [[0, "num"]],
 		    "commutative" : true
 		}

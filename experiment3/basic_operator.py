@@ -13,19 +13,6 @@ class BasicOperator(ABC):
     def get_representation(self, arg_list: List[str], state: Dict[str, Any]):
         raise NotImplementedError()
 
-    def get_values(self, arg_list, state):
-        values = []
-        for arg in arg_list:
-            num = state.get(arg)
-            if num is None:
-                try:
-                    num = int(arg)
-                except ValueError:
-                    num = float(arg)
-            values.append(num)
-
-        return values
-
             
 
         
