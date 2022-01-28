@@ -1,0 +1,14 @@
+{
+    "question": "",
+    "answer": {
+        "number": "",
+        "date": {
+            "day": "",
+            "month": "",
+            "year": ""
+        },
+        "spans": []
+    },
+    "query_id": "",
+    "validated_answers": []
+}

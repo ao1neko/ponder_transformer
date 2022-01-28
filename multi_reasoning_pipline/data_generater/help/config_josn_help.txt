@@ -1,0 +1,129 @@
+{
+    "seed" : 616,
+    "number_of_symbols" : 26,
+    "max_number_of_question" : 10,
+    "min_value" : 1,
+    "max_value" : 9,
+    "dtype" : "int",
+    "output_type" : "ask_all_variables",
+
+
+    "generation_rules" : [
+
+	
+	{
+	    "type" : "template", # テンプレート形式による生成を指定
+	    "selection_probability" : 0.5, #このルールが選択される確率
+
+	    # 生成する推論時の形式を指定. 上から順に生成されます. 
+	    "assignment_format" : [
+		    
+		{
+		    "type" : "Substitution", # reasning_operator.txtに定義された代入方法を指定してください. 
+		    "format" : ["num"] # 何を代入するかを指定します. "num"はランダムな数値を代入することを意味します. 
+		},
+		
+		
+		{
+		    "type" : "Substitution",
+		    "format" : ["num", "var"] #数字 or 変数による代入を行うことを意味します.
+		},
+		
+		
+		{
+		    "type" : "AddSubstitution",　# 足し算した結果を代入することを意味します. 
+		    "format" : [[0, "num"], [1, "num"], ["var", "var"]],
+		    # 0や1は, 先頭から数えてn番目に代入された変数を用いて代入を行うことを意味します. 例えば[0, "num"]は最初に代入された変数とランダムな数字を用いて足し算を行い, その結果を代入することを意味しています. 
+		    "commutative" : true
+		    # [0, "num"]でも["num", 0]でもどちらでも良いと指定します. 
+		},
+		
+		
+		{
+		    "type" : "AddSubstitution",
+		    "format" : [["var", "var"]]
+		}
+		
+	    ],
+	    
+	
+	    # 最終的な計算内容を指定します. 
+	    "operator" : {
+		"type" : ["Add", "Max", "WhoMax"],
+		# それぞれの演算が選択される確率をあらわします. 実はこの確率値の総和は1である必要はなく, それぞれが相対的な重みとなり選択が行われなす. 
+		"selection_probabilities" : [0.33333, 0.33333, 0.33333],
+		# 引数として, どの変数を使うかを指定します. マイナスは# pythonのリストのインデックスの指定方法と同じ意味で, 最後から数えて何番目の代入された変数を用いるかを意味します. ランダムにしたい場合は"random"を選択してください. ("random"の指定は引数ごとに必要です. )
+		"arg_pos" : [[-1, -2]],  
+		"commutative" : true
+	    }
+	},
+
+
+	
+
+	{
+	    "type" : "random", ランダムなデータを生成する形式です. 
+	    "selection_probability" : 0.5,
+
+	    # 生成されるデータのステップ数の最大, 最小を指定します. 
+	    "reasning_step" : {
+		"min" : 4,
+		"max" : 5
+	    },
+	  
+
+	    # assignment_formatに記述された内容の中から, ランダムで代入方法が選択されてデータが構成されていきます. 
+	    "assignment_format" : [
+	
+		{
+		    "type" : "Substitution",
+		    # randomのタイプではformatは1種類しか選択できません. これは, 各代入法ごとに, ステップ数や選択される確率を規定する必要があるためです. 同一の代入のtypeで, 異なるformatを用いたい場合には, 複数に分けて設定してください. 
+		    "format" : ["num"], 
+		    "step_weight" : 1, # この代入形式の消費ステップ数を表します. 
+		    "probability" : 0.2 # この代入形式が選択される確率を指定します. 
+		},
+		
+		
+		{
+		    "type" : "Substitution",
+		    "format" : ["var"],
+		    "step_weight" : 1,
+		    "probability" : 0.2
+		},
+		
+		
+		{
+		    "type" : "AddSubstitution",
+		    "format" : [["num", "num"]],
+		    "step_weight" : 1,
+		    "probability" : 0.2
+		},
+		
+		
+		{
+		    "type" : "AddSubstitution",
+		    "format" : [["var", "num"]],
+		    "step_weight" : 1,
+		    "probability" : 0.2,
+		    "commutative" : true
+		},
+				
+		
+		{
+		    "type" : "AddSubstitution",
+		    "format" : [["var", "var"]],
+		    "step_weight" : 2,
+		    "probability" : 0.2
+		}
+		
+	    ],
+	    
+
+	    "operator" : {
+		"type" : ["WhoMax"],
+		"selection_probabilities" : [1],
+		"arg_pos" : [["random", "random"]]
+	    }
+	}
+    ]
+}
