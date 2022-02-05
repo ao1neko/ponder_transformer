@@ -1,24 +1,13 @@
-import argparse
 
+from unittest import TestLoader
 import torch
 import torch.nn as nn
-from util import make_tgt_mask, PositionalEncoder,RandomPositionalEncoder
-from einops import rearrange, repeat
-import math
-import matplotlib.pyplot as plt
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
-from tqdm import tqdm
-from ponder_transformer import ReconstructionLoss, RegularizationLoss, MyRegularizationLoss
 from util import make_tgt_mask
-import torch.nn.functional as F
-from einops import rearrange
 from torch.utils.tensorboard import SummaryWriter
-
+from pathlib import Path
+import os
 
 
 class RunModel():
@@ -31,11 +20,6 @@ class RunModel():
         self.model = model
         self.device = device
         self.writer = writer
-        self.model_calculate_loss= self.model.calculate_loss, 
-        self.model_calculate_acc = self.model.calculate_acc,
-        self.model_init_analyze = self.model.init_analyze,
-        self.model_analyze = self.model.analyze,
-        self.model_finish_analyze = self.model.finish_analyze
         
     def run(self,x,true_y,pad_id):
         tgt_mask = make_tgt_mask(true_y.shape[1]).to(self.device)
@@ -59,19 +43,19 @@ class RunModel():
             optimizer.zero_grad()
             x = x.to(self.device)
             true_y = true_y.to(self.device)
-            outputs = self.run(self,x,true_y,pad_id)
-            loss = self.calculate_loss(outputs, true_y)
+            outputs = self.run(x,true_y,pad_id)
+            loss = self.model.calculate_loss(outputs, true_y,pad_id)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5)
             optimizer.step()
             total_loss += loss.item()
-            total_acc += self.calculate_acc(outputs, true_y)
+            total_acc += self.model.calculate_acc(outputs, true_y,pad_id)
                 
-            self.writer.add_scalar("Loss/train", total_loss/len(train_loader), epoch)
-            self.writer.add_scalar("Acc/train", total_acc/len(train_loader.dataset), epoch)
-            self.writer.flush()
-            print(f"train_loss:{total_loss/len(train_loader)}")
-            print(f"train_acc:{total_acc/len(train_loader.dataset)}")
+        self.writer.add_scalar("Loss/train", total_loss/len(train_loader), epoch)
+        self.writer.add_scalar("Acc/train", total_acc/len(train_loader.dataset), epoch)
+        self.writer.flush()
+        print(f"train_loss:{total_loss/len(train_loader)}")
+        print(f"train_acc:{total_acc/len(train_loader.dataset)}")
 
     
     def valid(
@@ -79,32 +63,33 @@ class RunModel():
         valid_loader: DataLoader = None,
         epoch: int = 0,
         pad_id: int = 0,
-        modelsave_path = "best_ponder_models/",
+        model_save_path:Path = Path("best_ponder_models"),
         ):
-        
-        self.model.eval()
         with torch.no_grad():
             best_accuracy = 0.0
-            best_loss = int("inf")
+            best_loss = 100000000
             valid_total_loss = 0.0
             valid_total_acc = 0.0
+            self.model.eval()
             for x, true_y in valid_loader:
                 x = x.to(self.device)
                 true_y = true_y.to(self.device)
-                outputs = self.run(self,x,true_y,pad_id)
-                loss = self.calculate_loss(outputs, true_y)
+                outputs = self.run(x,true_y,pad_id)
+                loss = self.model.calculate_loss(outputs, true_y,pad_id)
                 valid_total_loss += loss.item()
-                valid_total_acc += self.calculate_acc(outputs, true_y)
+                valid_total_acc += self.model.calculate_acc(outputs, true_y,pad_id)
                 
-            if best_accuracy <= valid_total_acc/len(valid_data): 
-                best_accuracy = valid_total_acc/len(valid_data)
-                torch.save(self.model.state_dict(), modelsave_pass+'_state_dict.pt')
+            if best_accuracy <= valid_total_acc/len(valid_loader.dataset): 
+                best_accuracy = valid_total_acc/len(valid_loader.dataset)
+                if not os.path.exists(model_save_path) : 
+                     os.mkdir(model_save_path)
+                torch.save(self.model.state_dict(), model_save_path / Path('state_dict.pt'))
                 
             self.writer.add_scalar("Loss/valid", valid_total_loss/len(valid_loader), epoch)
-            self.writer.add_scalar("Acc/valid", valid_total_acc/len(valid_data), epoch)
+            self.writer.add_scalar("Acc/valid", valid_total_acc/len(valid_loader.dataset), epoch)
             self.writer.flush()
             print(f"valid_loss:{valid_total_loss/len(valid_loader)}")
-            print(f"valid_acc:{valid_total_acc/len(valid_data)}")
+            print(f"valid_acc:{valid_total_acc/len(valid_loader.dataset)}")
 
     
     def test(
@@ -118,31 +103,31 @@ class RunModel():
             for x, true_y in test_loader:
                 x = x.to(self.device)
                 true_y = true_y.to(self.device)
-                outputs = self.run(self,x,true_y,pad_id)
-                test_total_acc += self.calculate_acc(outputs, true_y,pad_id=pad_id)
-            print(f"test_acc:{test_total_acc/len(test_data)}")
+                outputs = self.run(x,true_y,pad_id)
+                test_total_acc += self.model.calculate_acc(outputs, true_y,pad_id=pad_id)
+            print(f"test_acc:{test_total_acc/len(test_loader.dataset)}")
             
             
     def analyze(
         self,
-        test_loader: DataLoader,
+        analyze_loader: DataLoader,
         pad_id: int = 0,
     ):
         self.model.eval()
         with torch.no_grad():
             test_total_loss = 0.0
             test_total_acc = 0.0
-            self.model_init_analyze()
-            for x, true_y in test_loader:
+            self.model.init_analyze()
+            for x, true_y in analyze_loader:
                 x = x.to(self.device)
                 true_y = true_y.to(self.device)
-                outputs = self.run(self,x,true_y,pad_id)
-                loss = self.calculate_loss(outputs, true_y)
+                outputs = self.run(x,true_y,pad_id)
+                loss = self.model.calculate_loss(outputs, true_y,pad_id)
                 test_total_loss += loss.item()
-                test_total_acc += self.calculate_acc(outputs, true_y,pad_id=pad_id)
+                test_total_acc += self.model.calculate_acc(outputs, true_y,pad_id=pad_id)
                 
-                self.model_analyze(x,true_y,outputs,test_loader)
+                self.model.analyze(x,true_y,outputs,analyze_loader)
                 
-            self.model_finish_analyze()
-            print(f"test_loss:{test_total_loss/len(test_loader)}")
-            print(f"test_acc:{test_total_acc/len(test_data)}")
+            self.model.finish_analyze()
+            print(f"test_loss:{test_total_loss/len(analyze_loader)}")
+            print(f"test_acc:{test_total_acc/len(analyze_loader.dataset)}")
