@@ -15,7 +15,7 @@ class BaseModel(nn.Module):
         num_layers=1,
         nhead=8,
         num_token=100,
-        rand_pos_encoder_type = "all",
+        rand_pos_encoder_type = True,
         device = torch.device("cpu")
     ):
         super().__init__()
@@ -25,7 +25,7 @@ class BaseModel(nn.Module):
         self.nhead = nhead
         self.device = device
         self.embedding = nn.Embedding(num_embeddings=vocab_size, embedding_dim=emb_dim)
-        self.rand_pos_encoder = RandomPositionalEncoder(d_model=emb_dim) if rand_pos_encoder_type == "all" else  RandomPositionalEncoder(d_model=emb_dim)
+        self.rand_pos_encoder = RandomPositionalEncoder(d_model=emb_dim) if rand_pos_encoder_type == True else PositionalEncoder(d_model=emb_dim)
         self.pos_encoder = PositionalEncoder(d_model=emb_dim)
         self.output_layer = nn.Linear(emb_dim, self.num_token)
         
@@ -60,7 +60,7 @@ class PonderTransformer(BaseModel):
         num_layers=1,
         nhead=8,
         num_token=100,
-        rand_pos_encoder_type = "all",
+        rand_pos_encoder_type = True,
         allow_halting=False,
         absolute_halting = False,
         lambda_p = 6,
@@ -220,7 +220,7 @@ class Transformer(BaseModel):
         num_layers=1,
         nhead=8,
         num_token=100,
-        rand_pos_encoder_type = "all",      
+        rand_pos_encoder_type = True,      
         device = torch.device("cpu")  
         ):
         super().__init__(
@@ -244,7 +244,7 @@ class Transformer(BaseModel):
         y = self.output_layer(y)
         return y
 
-    def calculate_acc(pred_y:torch.Tensor,true_y:torch.Tensor,pad_id=0)-> int:
+    def calculate_acc(self,pred_y:torch.Tensor,true_y:torch.Tensor,pad_id=0)-> int:
         count = 0
         true_y= true_y[:,1:]
         pred_y = torch.argmax(pred_y[:,:-1], dim=-1)
@@ -261,6 +261,26 @@ class Transformer(BaseModel):
         return self.loss_func(pred_y,true_y,pad_id=pad_id)
         
 
+    def init_analyze(self):
+        file_path = 'model_analyze/analyze.txt'
+        if os.path.exists(file_path): 
+            os.remove(file_path)
+    
+    def analyze(self,x,true_y,outputs,test_loader):
+        id_dic = test_loader.dataset.id_dic
+        pred_y = outputs
+        with open('model_analyze/analyze.txt', 'a') as f:
+            str_x=[id_dic[id] for id in x[0].tolist()]
+            true_y_str = [id_dic[id] for id in true_y[0].tolist()]
+            pred_y_str = ['<CLS>']+[id_dic[id] for id in torch.argmax(pred_y[0],dim=-1)[:-1].tolist()]
+            f.write(f'x:{str_x}\n')
+            f.write(f'true_y:{true_y_str}\n')
+            f.write(f'pred_y:{pred_y_str}\n')
+
+    def finish_analyze(self):
+        pass
+        
+
 class LoopTransformer(BaseModel):
     def __init__(
         self,
@@ -269,7 +289,7 @@ class LoopTransformer(BaseModel):
         num_layers=1,
         nhead=8,
         num_token=100,
-        rand_pos_encoder_type = "all",      
+        rand_pos_encoder_type = True,      
         device = torch.device("cpu")  
     ):
         super().__init__(
@@ -301,6 +321,7 @@ class LoopTransformer(BaseModel):
         h = self.output_layer(h)
         return h
 
+#後で
     def calculate_acc(pred_y:torch.Tensor,true_y:torch.Tensor,pad_id=0)-> int:
         return Transformer().calculate_acc(pred_y,true_y,pad_id=0)
     

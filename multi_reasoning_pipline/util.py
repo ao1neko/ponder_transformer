@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from typing import List, Dict
 import json
 import math
@@ -45,28 +46,29 @@ def convert_str(str:str):
 
 
 class PositionalEncoder(torch.nn.Module):
-    def __init__(self, d_model, max_seq_len=1000):
-        super().__init__()
-        self.d_model = d_model
+    def __init__(self, d_model, max_seq_len=300,dropout=0.5):
         pe = torch.zeros(max_seq_len, d_model)
-        for pos in range(max_seq_len):
-            for i in range(0, d_model, 2):
-                pe[pos, i] = \
-                    math.sin(pos / (10000 ** ((2 * i) / d_model)))
-                pe[pos, i + 1] = \
-                    math.cos(pos / (10000 ** ((2 * (i + 1)) / d_model)))
+        position = torch.arange(0, max_seq_len).unsqueeze(1)
+        div_term = torch.exp((torch.arange(0, d_model, 2, dtype=torch.float) *
+                             -(math.log(10000.0) / d_model)))
+        pe[:, 0::2] = torch.sin(position.float() * div_term)
+        pe[:, 1::2] = torch.cos(position.float() * div_term)
         pe = pe.unsqueeze(0)
+        super(PositionalEncoder, self).__init__()
         self.register_buffer('pe', pe)
+        self.dim = d_model
 
     def forward(self, x):
-        with torch.no_grad():
-            x = x * math.sqrt(self.d_model)
-            seq_len = x.size(1)
-            pe = self.pe[:, :seq_len]
-            x = x + pe
-            return x
+        x = x * math.sqrt(self.dim)
+        if self.training:
+            pe_alt = self.pe[:,:x.size(1)].detach()
+            x = x + pe_alt
+        else:
+            x = x + self.pe[:,:x.size(1)]
+        #emb = self.dropout(emb)
+        return x
                 
-
+"""
 class RandomPositionalEncoder(torch.nn.Module):
     def __init__(self, d_model, max_seq_len=1000):
         super().__init__()
@@ -89,5 +91,31 @@ class RandomPositionalEncoder(torch.nn.Module):
             pe = self.pe[:, k:seq_len+k]
             x = x + pe
             return x
+"""
+class RandomPositionalEncoder(nn.Module):
+    def __init__(self, d_model, max_seq_len=300,dropout=0.5):
+        pe = torch.zeros(max_seq_len, d_model)
+        position = torch.arange(0, max_seq_len).unsqueeze(1)
+        div_term = torch.exp((torch.arange(0, d_model, 2, dtype=torch.float) *
+                             -(math.log(10000.0) / d_model)))
+        pe[:, 0::2] = torch.sin(position.float() * div_term)
+        pe[:, 1::2] = torch.cos(position.float() * div_term)
+        pe = pe.unsqueeze(0)
+        super(RandomPositionalEncoder, self).__init__()
+        self.register_buffer('pe', pe)
+        self.dim = d_model
 
 
+    def forward(self, x):
+        x = x * math.sqrt(self.dim)
+        if self.training:
+            bsz,seq_len , _ = x.shape
+            positions = torch.arange(seq_len, device=self.pe.device).repeat(bsz, 1)
+            position_offset = torch.randint(0, 50, size=(bsz,), device=self.pe.device)
+            positions = positions + position_offset[:, None]
+            pe_alt = self.pe.index_select(1, positions.view(-1)).view(bsz, seq_len, -1).detach()
+            x = x + pe_alt
+        else:
+            x = x + self.pe[:,:x.size(1)]
+        #emb = self.dropout(emb)
+        return x

@@ -38,7 +38,7 @@ if [ $method = "pretrain" ]; then
         --valid_json_names=$pretrain_data \
         --test_json_names=$pretrain_data \
         --comment="no_comment" \
-        --ignore_comment_args train pretrain load_model test analyze ponder_model loop_model vanilla_model valid_json_names test_json_names comment json_base_dir model_load_path model_save_path tensorboard_log_dir device ignore_comment_args 
+        --ignore_comment_args beta lambda_p train pretrain load_model test analyze ponder_model loop_model vanilla_model valid_json_names test_json_names comment json_base_dir model_load_path model_save_path tensorboard_log_dir device ignore_comment_args 
 elif [ $method = "train" ]; then
     PYTHONHASHSEED=0 python main.py \
         --epochs=300 \
@@ -66,7 +66,7 @@ elif [ $method = "train" ]; then
         --valid_json_names=$valid_data \
         --test_json_names=$test_data \
         --comment="no_comment" \
-        --ignore_comment_args train pretrain load_model test analyze ponder_model loop_model vanilla_model valid_json_names test_json_names comment json_base_dir model_load_path model_save_path tensorboard_log_dir device ignore_comment_args 
+        --ignore_comment_args beta lambda_p train pretrain load_model test analyze ponder_model loop_model vanilla_model test_json_names comment json_base_dir model_load_path model_save_path tensorboard_log_dir device ignore_comment_args 
 elif [ $method = "test" ]; then
     PYTHONHASHSEED=0 python main.py \
         --epochs=300 \
@@ -93,7 +93,7 @@ elif [ $method = "test" ]; then
         --valid_json_names=$valid_data \
         --test_json_names=$test_data \
         --comment="no_comment" \
-        --ignore_comment_args train pretrain load_model test analyze ponder_model loop_model vanilla_model valid_json_names test_json_names comment json_base_dir model_load_path model_save_path tensorboard_log_dir device ignore_comment_args 
+        --ignore_comment_args beta lambda_p train pretrain load_model test analyze ponder_model loop_model vanilla_model valid_json_names test_json_names comment json_base_dir model_load_path model_save_path tensorboard_log_dir device ignore_comment_args 
 
 elif [ $method = "analyze" ]; then
     PYTHONHASHSEED=0 python main.py \
@@ -121,7 +121,7 @@ elif [ $method = "analyze" ]; then
         --valid_json_names=$valid_data \
         --test_json_names=$test_data \
         --comment="no_comment" \
-        --ignore_comment_args train pretrain load_model test analyze ponder_model loop_model vanilla_model valid_json_names test_json_names comment json_base_dir model_load_path model_save_path tensorboard_log_dir device ignore_comment_args 
+        --ignore_comment_args beta lambda_p train pretrain load_model test analyze ponder_model loop_model vanilla_model valid_json_names test_json_names comment json_base_dir model_load_path model_save_path tensorboard_log_dir device ignore_comment_args 
 else
     echo "invalid args"
     exit 1

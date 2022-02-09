@@ -35,6 +35,8 @@ def main(args):
     emb_dim = args.emb_dim
     model_load_path = Path(args.model_load_path)
     model_save_path = Path(args.model_save_path) / args_str
+    rand_pos_encoder_type = strtobool(args.rand_pos_encoder_type)
+    
     ponder_model = strtobool(args.ponder_model)
     loop_model = strtobool(args.loop_model)
     vanilla_model = strtobool(args.vanilla_model)
@@ -83,7 +85,8 @@ def main(args):
             num_token=vocab_size,
             lambda_p = lambda_p,
             beta = beta,
-            device = device
+            device = device,
+            rand_pos_encoder_type = rand_pos_encoder_type,
             ).to(device)
     elif loop_model:
         model = LoopTransformer(
@@ -91,6 +94,7 @@ def main(args):
             emb_dim=emb_dim,
             num_token=vocab_size,
             num_layers=num_layers,
+            rand_pos_encoder_type = rand_pos_encoder_type,
             device = device
             ).to(device)
     elif vanilla_model:
@@ -99,6 +103,7 @@ def main(args):
             emb_dim=emb_dim,
             num_token=vocab_size,
             num_layers=num_layers,
+            rand_pos_encoder_type = rand_pos_encoder_type,
             device = device,
             ).to(device)
     
@@ -176,6 +181,7 @@ if __name__ == '__main__':
     parser.add_argument('--vanilla_model', default='false')
     parser.add_argument('--lr',default=0.0003,type=float)
     parser.add_argument('--absolute_halting', default='true')
+    parser.add_argument('--rand_pos_encoder_type', default='true')
     parser.add_argument(
         '--model_load_path', default="best_models")
     parser.add_argument('--load_model', default='false') 
