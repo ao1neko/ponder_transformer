@@ -1,0 +1,27 @@
+{
+    "seed" : 615,
+    "number_of_symbols" : 2,
+    "max_number_of_question" : "inf",
+    "dtype" : "int",
+    "output_type" : "ask_last_question",
+	"shuffle_order": true,
+
+    "generation_rules" : [
+	{
+	    "type" : "template",
+	    "selection_probability" : 1.0,
+	    "assignment_format" : [   
+		{
+		    "type" : ["Add"],
+		    "format" : [["num","num","num","num","num"]],
+		    "commutative" : true
+		}
+	    ],    
+	    "operator" : {
+		"type" : ["Check"],
+		"selection_probabilities" : [1.0], 
+		"format" : [0]
+	    }
+	}
+    ]
+}

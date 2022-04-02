@@ -1,0 +1,16 @@
+./run_make_pretraindata.sh 200
+./run_makedata.sh arg2 10 10 10
+
+./run_vanilla.sh pretrain
+./run_vanilla.sh train
+./run_vanilla.sh test
+./run_vanilla.sh analyze
+
+200 事前学習
+analyze
+arg2 train 
+analyze
+arg3 train
+analyze
+
+500 事前学習
