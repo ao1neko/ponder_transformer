@@ -83,10 +83,10 @@ class PonderTransformer(BaseModel):
         
         self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=self.emb_dim,nhead=self.nhead,batch_first=True)
         self.transformer_decoder_layer = nn.TransformerDecoderLayer(d_model=self.emb_dim,nhead=self.nhead,batch_first=True)
-        self.norm = nn.LayerNorm(self.emb_dim,eps = 1e-04)
+        self.norm = nn.LayerNorm(self.emb_dim,eps = 1e-5)
         
-        self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=1,norm=self.norm)
-        self.transformer_decoder = nn.TransformerDecoder(self.transformer_decoder_layer, num_layers=1,norm=self.norm)
+        self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=1)
+        self.transformer_decoder = nn.TransformerDecoder(self.transformer_decoder_layer, num_layers=1)
         self.lambda_layer = nn.Linear(self.emb_dim, 1)
         self.init_weights()
         
@@ -128,7 +128,9 @@ class PonderTransformer(BaseModel):
             h = true_y.clone()
             for _ in range(n):
                 h = self.transformer_decoder(tgt=h,memory=x,tgt_mask=tgt_mask,tgt_key_padding_mask=tgt_key_padding_mask,memory_key_padding_mask=src_key_padding_mask)
+            h = self.norm(h)
             h = self.output_layer(h)
+            h = self.norm(h)
             y_list.append(h)
             
             
@@ -262,20 +264,32 @@ class Transformer(BaseModel):
         
 
     def init_analyze(self):
-        file_path = 'model_analyze/analyze.txt'
-        if os.path.exists(file_path): 
-            os.remove(file_path)
+        file_path_list = ['model_analyze/analyze.txt','model_analyze/analyze_err.txt']
+        for file_path in file_path_list:
+            if os.path.exists(file_path): 
+                os.remove(file_path)
     
     def analyze(self,x,true_y,outputs,test_loader):
         id_dic = test_loader.dataset.id_dic
         pred_y = outputs
-        with open('model_analyze/analyze.txt', 'a') as f:
+        with open('model_analyze/analyze.txt', 'a') as f, open('model_analyze/analyze_err.txt', 'a') as f_err:
             str_x=[id_dic[id] for id in x[0].tolist()]
             true_y_str = [id_dic[id] for id in true_y[0].tolist()]
             pred_y_str = ['<CLS>']+[id_dic[id] for id in torch.argmax(pred_y[0],dim=-1)[:-1].tolist()]
             f.write(f'x:{str_x}\n')
             f.write(f'true_y:{true_y_str}\n')
             f.write(f'pred_y:{pred_y_str}\n')
+            
+            compare_flag=True
+            for true_y_str_w, pred_y_str_w in zip(true_y_str, pred_y_str):
+                if true_y_str_w != pred_y_str_w and pred_y_str_w!='<SEP>': 
+                    compare_flag = False
+                    break
+                    
+            if compare_flag == False:
+                f_err.write(f'x:{str_x}\n')
+                f_err.write(f'true_y:{true_y_str}\n')
+                f_err.write(f'pred_y:{pred_y_str}\n') 
 
     def finish_analyze(self):
         pass
@@ -303,6 +317,8 @@ class LoopTransformer(BaseModel):
         )
         self.transformer_encoder_layer = nn.TransformerEncoderLayer(d_model=self.emb_dim,nhead=self.nhead,batch_first=True)
         self.transformer_decoder_layer = nn.TransformerDecoderLayer(d_model=self.emb_dim,nhead=self.nhead,batch_first=True)
+        self.norm = nn.LayerNorm(self.emb_dim,eps = 1e-5)
+       
         self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_layers=1)
         self.transformer_decoder = nn.TransformerDecoder(self.transformer_decoder_layer, num_layers=1)
         self.init_weights()
@@ -315,9 +331,11 @@ class LoopTransformer(BaseModel):
         for _ in range(self.num_layers):
             x = self.transformer_encoder(x,src_key_padding_mask=src_key_padding_mask)    
         h = true_y.clone()
+        h = self.norm(h)
         
         for _ in range(self.num_layers):
             h = self.transformer_decoder(tgt=h,memory=x,tgt_mask=tgt_mask,tgt_key_padding_mask=tgt_key_padding_mask,memory_key_padding_mask=src_key_padding_mask)
+        h = self.norm(h)
         h = self.output_layer(h)
         return h
 

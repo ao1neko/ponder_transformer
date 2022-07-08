@@ -79,10 +79,10 @@ class RunModel():
                 valid_total_loss += loss.item()
                 valid_total_acc += self.model.calculate_acc(outputs, true_y,pad_id)
                 
-            if best_accuracy <= valid_total_acc/len(valid_loader.dataset): 
-                best_accuracy = valid_total_acc/len(valid_loader.dataset)
+            if valid_total_loss/len(valid_loader) < best_loss: 
+                best_loss = valid_total_loss/len(valid_loader)
                 if not os.path.exists(model_save_path) : 
-                     os.mkdir(model_save_path)
+                    os.makedirs(model_save_path)
                 torch.save(self.model.state_dict(), model_save_path / Path('state_dict.pt'))
                 
             self.writer.add_scalar("Loss/valid", valid_total_loss/len(valid_loader), epoch)

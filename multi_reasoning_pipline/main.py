@@ -36,7 +36,6 @@ def main(args):
     model_load_path = Path(args.model_load_path)
     model_save_path = Path(args.model_save_path) / args_str
     rand_pos_encoder_type = strtobool(args.rand_pos_encoder_type)
-    
     ponder_model = strtobool(args.ponder_model)
     loop_model = strtobool(args.loop_model)
     vanilla_model = strtobool(args.vanilla_model)
@@ -49,10 +48,9 @@ def main(args):
     
     #tensorboard
     log_dir = Path(args.tensorboard_log_dir) / args_str
-    writer = SummaryWriter(log_dir=log_dir)
+    writer = SummaryWriter(log_dir=log_dir) if train or pretrain else None
+    
     #データセット
-    
-    
     word_dic = make_word_dic()
     id_dic = make_id_dic(word_dic)
     train_data  =  JsonDataset(args.json_base_dir,args.train_json_names,word_dic=word_dic,id_dic=id_dic)
@@ -166,20 +164,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='このプログラムの説明')
     parser.add_argument('--epochs', default=30, type=int)
     parser.add_argument('--batch_size', default=128, type=int)
-    parser.add_argument('--num_layers', default=3, type=int)
-    parser.add_argument('--seed', default=66, type=int)
-    parser.add_argument('--emb_dim', default=128, type=int)
-    parser.add_argument('--beta', default=1.0, type=float)
-    parser.add_argument('--lambda_p', default=20, type=int)
+    parser.add_argument('--num_layers', default=6, type=int)
+    parser.add_argument('--seed', default=6, type=int)
+    parser.add_argument('--emb_dim', default=512, type=int)
+    parser.add_argument('--beta', default=0.01, type=float)
+    parser.add_argument('--lambda_p', default=4, type=int)
     parser.add_argument('--device', default="cuda:0")
-    parser.add_argument('--train', default='true')
+    parser.add_argument('--train', default='false')
     parser.add_argument('--pretrain', default='false')
     parser.add_argument('--test', default='false')
     parser.add_argument('--analyze', default='false')
-    parser.add_argument('--ponder_model', default='true')
+    parser.add_argument('--ponder_model', default='false')
     parser.add_argument('--loop_model', default='false')
     parser.add_argument('--vanilla_model', default='false')
-    parser.add_argument('--lr',default=0.0003,type=float)
+    parser.add_argument('--lr',default=0.0001,type=float)
     parser.add_argument('--absolute_halting', default='true')
     parser.add_argument('--rand_pos_encoder_type', default='true')
     parser.add_argument(

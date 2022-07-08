@@ -14,4 +14,4 @@ PYTHONHASHSEED=0 python $NUMERICAL_DIR/make_drop_format_data.py \
     
 echo "make drop format pretrain data"
 
-#./run_make_pretraindata.sh 100
+#./run_make_pretraindata.sh 500

@@ -26,4 +26,4 @@ PYTHONHASHSEED=0 python $NUMERICAL_DIR/make_drop_format_data.py \
     --max_number_of_question=${question_num[$i]}
 echo "make drop format ${method[$i]} data"
 done
-#./run_makedata.sh arg2 1000
+#./run_makedata.sh arg2 10000 1000 1000
