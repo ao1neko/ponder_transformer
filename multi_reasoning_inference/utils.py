@@ -12,7 +12,26 @@ import numpy as np
 import os
 from typing import List, Dict,Tuple
 import re
+import json
 
+def read_jsonl_file(input_file:Path):
+    with open(input_file, 'r') as input_json_file:
+        for json_data in input_json_file:
+            if json_data != "\n":
+                json_data = json.loads(json_data)
+                yield (json_data["input"],json_data["label"])
+            
+                
+def read_jsonl_files(input_file_list:List[Path]): 
+    inputs = []
+    labels = []
+    for input_file in input_file_list:
+        for (input, label) in read_jsonl_file(input_file):
+            inputs.append(input)
+            labels.append(label)
+    return (inputs, labels)
+        
+        
 
 def retrieve_last_string(str:str)-> str:
     match = re.search(r".*answer : (.+?)</s>",str)
@@ -43,7 +62,7 @@ def eliminate_calculated_index(calculated_list:List[int],test_theories:List[str]
             eliminated_test_labels.append(label)
     return (eliminated_test_theories, eliminated_test_questions, eliminated_test_labels)
 
-def proofwriter_at_once_predict(input_id_list,predict_id_list,label_id_list,tokenizer,output_dir)-> int:
+def at_once_predict(input_id_list,predict_id_list,label_id_list,tokenizer,output_dir)-> int:
     acc_num = 0
     analyze_file_path = Path(output_dir) / Path('analyze.txt')
     err_file_path = Path(output_dir) / Path('analyze_err.txt')
@@ -70,7 +89,7 @@ def proofwriter_at_once_predict(input_id_list,predict_id_list,label_id_list,toke
                 f_err.write(f"label:{label_text}\n")
     return acc_num
     
-def proofwriter_iterative_predict(input_id_list,predict_id_list,label_id_list,tokenizer,output_dir,step_index):
+def iterative_predict(input_id_list,predict_id_list,label_id_list,tokenizer,output_dir,step_index):
     acc_num = 0
     calculated_list = []
     predict_text_list = []
