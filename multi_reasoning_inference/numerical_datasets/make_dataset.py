@@ -46,7 +46,7 @@ def main(args):
     
     inference_step=args.inference_step
     equation_num=args.equation_num
-    output_dir = output_dir / Path(f"depth_{inference_step}_num_{equation_num}")
+    output_dir = output_dir / Path(f"depth_{inference_step}_distractor_{equation_num-inference_step}")
     
     
     json_number_set = make_json_number_set()

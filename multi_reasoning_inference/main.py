@@ -10,7 +10,7 @@ from pathlib import Path
 from tqdm import tqdm
 from torch.utils.data import Dataset
 from transformers import BartTokenizer,BartConfig
-from transformers import T5Tokenizer, T5ForConditionalGeneration
+from transformers import T5Tokenizer, T5ForConditionalGeneration, T5Config
 from bart.modeling_bart import BartForConditionalGeneration
 from reasoning_bart.modeling_reasoning_bart import ReasoningBartForConditionalGeneration
 from dentaku_tokenizer.t5_tokenizer import T5DentakuTokenizer
@@ -19,7 +19,7 @@ import numpy as np
 import os
 from typing import List, Dict
 
-from utils import read_jsonl_file,read_jsonl_files,at_once_predict,iterative_predict,clean_predict_text,eliminate_calculated_index
+from utils import read_jsonl_file,read_jsonl_files,at_once_predict,iterative_predict,clean_predict_text,eliminate_calculated_index, one_token_predict,one_token_eliminate_calculated_index
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -75,19 +75,20 @@ def main(args):
     predict = strtobool(args.predict)
     train_epochs = args.train_epochs
     eval_steps = args.eval_steps
+    save_steps = args.save_steps
     output_dir = args.output_dir
     run_dir = args.run_dir
     batch_size = args.batch_size
     learning_rate = args.learning_rate
     
-    assert architecture_name in ["at_once","iterative","ansonly"], "architecture_nameが間違っています"
+    assert architecture_name in ["at_once","iterative","ansonly","one_token"], "architecture_nameが間違っています"
     assert model_name in ["bart","reasoning_bart","t5"],"model_nameが間違っています"
     
     if model_name in ["bart","reasoning_bart"]:
         tokenizer = BartDentakuTokenizer.from_pretrained("facebook/bart-base")
     elif model_name in ["t5"]:
         tokenizer = T5DentakuTokenizer.from_pretrained("t5-base")
-        tokenizer_test = T5Tokenizer.from_pretrained("t5-base")
+        #tokenizer_base = T5Tokenizer.from_pretrained("t5-base")
      
     # inputs,labels：List[str]    
     train_inputs, train_labels = read_jsonl_files(train_dataset_names)
@@ -101,15 +102,21 @@ def main(args):
         valid_inputs, padding=True, truncation=True, return_tensors='pt')
     valid_tokenized_labels = tokenizer(
         valid_labels, padding=True, truncation=True, return_tensors='pt')
-    
-    
-    ids = tokenizer("text","text")["input_ids"]
-    print(ids)
-    print(train_inputs[0])
+    """
+    print([tokenizer.decode([0,1,2], skip_special_tokens=False, clean_up_tokenization_spaces=False)])
     print("\n")
     
-    print([tokenizer.decode(x, skip_special_tokens=False, clean_up_tokenization_spaces=False) for x in ids])
-    print([tokenizer.decode([0,1,2], skip_special_tokens=False, clean_up_tokenization_spaces=False)])
+    ids_0_base = tokenizer_base("This is 0")["input_ids"]
+    ids_01_base = tokenizer_base("This is 01")["input_ids"]
+    
+    print(ids_01)
+    print(ids_01_base)
+    print([tokenizer.decode(x, skip_special_tokens=False, clean_up_tokenization_spaces=False) for x in ids_01])
+    print([tokenizer_base.decode(x, skip_special_tokens=False, clean_up_tokenization_spaces=False) for x in ids_01_base])
+
+    print("\n")
+    
+    print(train_inputs[0])
     print([tokenizer.decode(x, skip_special_tokens=False, clean_up_tokenization_spaces=False) for x in train_tokenized_inputs.input_ids[0]])
     print("\n")
     
@@ -119,7 +126,7 @@ def main(args):
     print([tokenizer.decode(x, skip_special_tokens=False, clean_up_tokenization_spaces=False) for x in train_tokenized_inputs.input_ids[1]])
     
     exit()
-    
+    """
  
     train_dataset = SimpleDataset(
         train_tokenized_inputs, train_tokenized_labels["input_ids"])
@@ -137,15 +144,17 @@ def main(args):
         model = ReasoningBartForConditionalGeneration.from_pretrained(
             load_model_dir,config=config).to(device)
     elif model_name == "t5":
+        #config = T5Config.from_pretrained("t5-base")
         model = T5ForConditionalGeneration.from_pretrained(load_model_dir).to(device)
-
-    
+        #model = T5ForConditionalGeneration(config=config).to(device)
+        
     training_args = Seq2SeqTrainingArguments(
         output_dir=output_dir,
         evaluation_strategy="steps",
         eval_steps=eval_steps,
         save_strategy="steps",
-        save_steps=eval_steps,
+        save_steps=save_steps,
+        save_total_limit=1,
         learning_rate=learning_rate,
         num_train_epochs=train_epochs,
         optim="adamw_torch",
@@ -154,7 +163,7 @@ def main(args):
         seed=42,
         run_name=run_dir,
         load_best_model_at_end=True,
-        predict_with_generate=True
+        predict_with_generate=True,
     )
     
     trainer = Seq2SeqTrainer(
@@ -172,15 +181,49 @@ def main(args):
             test_tokenized_inputs = tokenizer(test_inputs, padding=True, truncation=True, return_tensors='pt')
             test_tokenized_labels = tokenizer(test_labels, padding=True, truncation=True, return_tensors='pt')
             test_dataset = SimpleDataset(test_tokenized_inputs, test_tokenized_labels["input_ids"])
-            predict_id_list,label_id_list, metrics = trainer.predict(test_dataset=test_dataset)
-            acc_num = at_once_predict(test_tokenized_inputs.input_ids,predict_id_list,label_id_list,tokenizer,output_dir)
+            predict_id_list,label_id_list, metrics = trainer.predict(test_dataset=test_dataset,max_length=500)
+            acc_num, inference_acc_num = at_once_predict(test_tokenized_inputs.input_ids,predict_id_list,label_id_list,tokenizer,output_dir)
             print(f"acc: {acc_num/len(test_labels)}")
+            print(f"inference acc {inference_acc_num/len(test_labels)}")
             
         
         elif architecture_name == "iterative":
-            test_inputs, test_labels = read_jsonl_files(test_dataset_names)            
-            MAX_STEPS = 5
+            test_inputs, test_labels = read_jsonl_files(test_dataset_names)      
+            MAX_STEPS = 100
             acc_num = 0            
+            inference_acc_num = 0
+            data_size = len(test_labels)
+            inference_acc_list = [1] * data_size
+            
+            
+            for i in range(MAX_STEPS):
+                test_tokenized_inputs = tokenizer(test_inputs, padding=True, truncation=True, return_tensors='pt')
+                test_tokenized_labels = tokenizer(test_labels, padding=True, truncation=True, return_tensors='pt')
+                
+                test_dataset = SimpleDataset(test_tokenized_inputs, test_tokenized_labels["input_ids"])
+                predict_id_list,label_id_list, metrics = trainer.predict(test_dataset=test_dataset,max_length=500)
+                
+                each_acc_num, each_inference_acc_num, calculated_list, predict_text_list,inference_acc_list = iterative_predict(test_tokenized_inputs.input_ids,predict_id_list,label_id_list,tokenizer,output_dir,inference_acc_list,i)
+                acc_num += each_acc_num
+                inference_acc_num += each_inference_acc_num
+                
+                predict_text_list = clean_predict_text(predict_text_list)
+                if i==0:
+                    test_inputs = list(map(lambda x,y: x +  " " + y ,test_inputs,predict_text_list))
+                else:
+                    test_inputs = list(map(lambda x,y: x + " , " + y ,test_inputs,predict_text_list))
+                test_inputs, test_labels,inference_acc_list = eliminate_calculated_index(calculated_list,test_inputs, test_labels,inference_acc_list)
+                if len(test_inputs) == 0 : break
+                
+            print(f"acc: {acc_num/data_size}")
+            print(f"inference acc {inference_acc_num/data_size}")
+            
+            
+        elif architecture_name == "one_token":
+            test_inputs, test_labels = read_jsonl_files(test_dataset_names)      
+            MAX_STEPS = 500
+            acc_num = 0            
+            inference_acc_num = 0
             data_size = len(test_labels)
             
             for i in range(MAX_STEPS):
@@ -188,23 +231,24 @@ def main(args):
                 test_tokenized_labels = tokenizer(test_labels, padding=True, truncation=True, return_tensors='pt')
                 
                 test_dataset = SimpleDataset(test_tokenized_inputs, test_tokenized_labels["input_ids"])
-                predict_id_list,label_id_list, metrics = trainer.predict(test_dataset=test_dataset)
+                predict_id_list,label_id_list, metrics = trainer.predict(test_dataset=test_dataset,max_length=5)
                 
-                each_acc_num, calculated_list, predict_text_list = iterative_predict(test_tokenized_inputs.input_ids,predict_id_list,label_id_list,tokenizer,output_dir,i)
+                each_acc_num, each_inference_acc_num, last_token_list, predict_text_list = one_token_predict(test_tokenized_inputs.input_ids,predict_id_list,label_id_list,tokenizer,output_dir,i)
                 acc_num += each_acc_num
+                inference_acc_num += each_inference_acc_num
                 
                 predict_text_list = clean_predict_text(predict_text_list)
-                test_inputs = list(map(lambda x,y: x + " , " + y ,test_inputs,predict_text_list))
-                test_inputs, test_labels = eliminate_calculated_index(calculated_list,test_inputs, test_labels)
+                test_inputs = list(map(lambda x,y: x +  " " + y ,test_inputs,predict_text_list))
+                test_inputs, test_labels = one_token_eliminate_calculated_index(last_token_list,test_inputs, test_labels)
                 if len(test_inputs) == 0 : break
                 
             print(f"acc: {acc_num/data_size}")
-    
+            print(f"inference acc {inference_acc_num/data_size}")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='このプログラムの説明')
     parser.add_argument('--device', default="cuda:0")
-    parser.add_argument('--architecture_name', default="sample")
+    parser.add_argument('--architecture_name', default="ansonly")
     parser.add_argument('--train_dataset_names', default="train1,train2")
     parser.add_argument('--valid_dataset_names', default="valid1,valid2")
     parser.add_argument('--test_dataset_names', default="test1,valid2")
@@ -214,6 +258,7 @@ if __name__ == '__main__':
     parser.add_argument('--predict', default='false')
     parser.add_argument('--train_epochs', default=100, type=int)
     parser.add_argument('--eval_steps', default=100, type=int)
+    parser.add_argument('--save_steps', default=10000, type=int)
     parser.add_argument('--output_dir', default="save/test")
     parser.add_argument('--run_dir', default="save/test")
     parser.add_argument('--batch_size', default=16, type=int)

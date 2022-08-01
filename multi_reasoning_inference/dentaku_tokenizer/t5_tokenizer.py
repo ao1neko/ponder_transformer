@@ -24,13 +24,7 @@ class T5DentakuTokenizer(T5Tokenizer):
         for word in encoded_text:
             if self._is_int(word):
                 splited_word = list(word)
-                if  splited_word[0] == "▁": 
-                    splited_word.remove("▁")
-                    splited_word[0] = "▁" + splited_word[0]
-                    tokenized_text = tokenized_text + splited_word
-                else:
-                    splited_word[0] = "▁" + splited_word[0]
-                    tokenized_text = tokenized_text[:-1] + splited_word
+                tokenized_text = tokenized_text + splited_word
             else:
                 tokenized_text.append(word)
         return tokenized_text

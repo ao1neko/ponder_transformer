@@ -1,6 +1,7 @@
 import argparse
 from cmath import e, log
 from operator import eq
+from tkinter import N
 import numpy as np
 import torch
 import torch.optim as optim
@@ -72,6 +73,7 @@ class Equation():
 
 class DataInstance():
     def __init__(self,useable_char_set: Set = set(string.ascii_uppercase),useable_int_set:Set = set(range(100))):
+        self.inference_step = None
         self.equations = []
         self.forward_inference_equations = []
         self.forward_backtrack_inference_equations = []
@@ -99,6 +101,7 @@ class DataInstance():
             "equations" : [x.to_str() for x in self.equations],
             "question" : self.question,
             "answer" : self.answer,
+            "inference_step" : self.inference_step,
             "inference_equations" : {
                 "forward_inference_equations" : [x.to_str() for x in self.forward_inference_equations],
                 "forward_backtrack_inference_equations" : [x.to_str() for x in self.forward_backtrack_inference_equations],
@@ -113,6 +116,7 @@ class DataInstance():
     
     def from_json(self,json_data:str):
         json_dict = json.loads(json_data)
+        self.inference_step = json_dict["inference_step"]
         self.equations = self._equations_from_str(json_dict["equations"])
         self.forward_inference_equations = self._equations_from_str(json_dict["inference_equations"]["forward_inference_equations"])
         self.forward_backtrack_inference_equations = self._equations_from_str(json_dict["inference_equations"]["forward_backtrack_inference_equations"])
@@ -132,6 +136,7 @@ class DataInstance():
             
 
     def make_instance(self, inference_step: int, equation_num: int):
+        self.inference_step = inference_step
         self._make_minimum_instance(inference_step)
         for _ in range(equation_num - inference_step):
             self._make_relate_equation()
@@ -148,7 +153,7 @@ class DataInstance():
                                inference_step: int,):
         useable_char_set = self.useable_char_set.copy()
         self.question = random.choice(list(useable_char_set))
-        self.answer = 0
+        self.answer = None
         use_char_set = set(self.question)
 
         useable_char_set = useable_char_set - use_char_set
@@ -181,21 +186,22 @@ class DataInstance():
                 equation_right_int_num=equation_right_int_num,
                 equation_right_char_num=equation_right_char_num,
             )
-            for arg in equation.right_side:
-                if type(arg) is int:
-                    self.answer = (self.answer + arg ) % 100
 
             self.equations.append(equation)
             use_char_set = use_char_set | equation.right_char_set
             
             useable_char_set = useable_char_set - equation.right_char_set
+        
+        
+        
+        
 
     def _make_relate_equation(self,):
         useable_char_set = self.useable_char_set.copy() - self.char_set
         if len(self.char_set) >= 2 :
-            args_tyep = np.random.choice(["int_num_0_char_num_2", "int_num_0_char_num_1", "int_num_1_char_num_1", "int_num_1_char_num_0","int_num_2_char_num_0"], p=[0.2, 0.2, 0.2, 0.2,0.2])
+            args_tyep = np.random.choice(["int_num_0_char_num_2", "int_num_0_char_num_1", "int_num_1_char_num_1", "int_num_1_char_num_0"], p=[0.25, 0.25, 0.25, 0.25])
         else:
-            args_tyep = np.random.choice(["int_num_0_char_num_1", "int_num_1_char_num_1", "int_num_1_char_num_0","int_num_2_char_num_0"], p=[0.25, 0.25, 0.25, 0.25])
+            args_tyep = np.random.choice(["int_num_0_char_num_1", "int_num_1_char_num_1", "int_num_1_char_num_0"], p=[0.3, 0.4, 0.3])
 
             
         if args_tyep == "int_num_0_char_num_2":
@@ -209,9 +215,6 @@ class DataInstance():
             equation_right_char_num = 1
         elif args_tyep == "int_num_1_char_num_0":
             equation_right_int_num = 1
-            equation_right_char_num = 0
-        elif args_tyep == "int_num_2_char_num_0":
-            equation_right_int_num = 2
             equation_right_char_num = 0
             
             
@@ -332,6 +335,34 @@ class DataInstance():
                                 equation.calc_char_set()
                                 self.forward_inference_equations.append(
                                     equation)
+        if self.answer is None: self.answer = solved_char_dict[self.question]
+
+
+
+
+    '''
+                            if len(equation.right_char_set) == 0:
+                                if len(equation.right_side) == 1:
+                                    key = equation.left_side[0]
+                                    value = equation.right_side[0]
+                                    solved_char_dict[key] = value
+                                else:
+                                    equation.right_side = [
+                                        equation.calc_side_int_sum(calc_side="right")]
+                                    equation.calc_char_set()
+                                    self.forward_backtrack_inference_equations.append(
+                                        equation)
+    '''
+
+
+
+
+
+
+
+
+
+
 
     def _make_forward_backtrack_inference_equations(self):
         
@@ -371,12 +402,15 @@ class DataInstance():
                                 equation.calc_char_set()
                                 self.forward_backtrack_inference_equations.append(
                                     equation)
+                if self.question in solved_char_dict.keys() : break
+        if self.answer is None: self.answer = solved_char_dict[self.question]
 
     def _make_backward_inference_equations(self):
         
         solved_char_dict = self._make_solved_char_dict()
         goal_equation = self._search_relate_equation(
             search_char=self.question, search_side="left")
+        
         
         if self.question not in solved_char_dict.keys() :
             self.backward_inference_equations.append(goal_equation)
@@ -414,5 +448,6 @@ class DataInstance():
                     equation = self._search_relate_equation(
                         search_char=search_char, search_side="left")
                     self.backward_inference_equations.append(equation)
+        if self.answer is None: self.answer = solved_char_dict[self.question]
 
 
